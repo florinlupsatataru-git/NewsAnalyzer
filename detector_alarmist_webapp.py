@@ -13,15 +13,25 @@ def sterge_text():
     st.session_state.input_text = ""
 
 # --- 3. ÎNCĂRCARE MODEL CU CACHE ---
+#@st.cache_resource
+#def load_model():
+#    model_path = "./model_alarmism_final"
+#    try:
+#        tokenizer = AutoTokenizer.from_pretrained(model_path)
+#        model = AutoModelForSequenceClassification.from_pretrained(model_path)
+#        return pipeline("text-classification", model=model, tokenizer=tokenizer)
+#    except Exception as e:
+#        st.error(f"Eroare: Modelul nu a fost găsit în {model_path}. Detalii: {e}")
+#        return None
+
 @st.cache_resource
 def load_model():
-    model_path = "./model_alarmism_final"
+    model_path = "florin-lupsa/NewsAnalyzer" 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
-        model = AutoModelForSequenceClassification.from_pretrained(model_path)
-        return pipeline("text-classification", model=model, tokenizer=tokenizer)
+        # Pipeline-ul va descărca automat fișierele de pe Hugging Face la prima rulare online
+        return pipeline("text-classification", model=model_path, tokenizer=model_path)
     except Exception as e:
-        st.error(f"Eroare: Modelul nu a fost găsit în {model_path}. Detalii: {e}")
+        st.error(f"Eroare la încărcarea modelului de pe Hugging Face: {e}")
         return None
 
 cls_pipeline = load_model()
