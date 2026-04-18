@@ -85,22 +85,21 @@ if analizeaza and input_utilizator:
             st.divider()
             m1, m2 = st.columns(2)
             with m1:
-                # Modificat eticheta pentru claritate: scorul reprezintă certitudinea pentru eticheta detectată
-                label_display_t = "Alarmism" if rez_titlu['label'] == "LABEL_1" else "Informativ"
-                st.metric(label=f"Certitudine {label_display_t} Titlu", value=f"{scor_titlu:.1f}%")
+                # Modificat: Afișăm încrederea în funcție de ce etichetă a ales modelul
+                tip_t = "Alarmism" if rez_titlu['label'] == "LABEL_1" else "Informativ"
+                st.metric(label=f"Certitudine {tip_t} (Titlu)", value=f"{scor_titlu:.1f}%")
             with m2:
-                label_display_x = "Alarmism" if rez_text['label'] == "LABEL_1" else "Informativ"
-                st.metric(label=f"Certitudine {label_display_x} Conținut", value=f"{scor_text:.1f}%")
+                tip_x = "Alarmism" if rez_text['label'] == "LABEL_1" else "Informativ"
+                st.metric(label=f"Certitudine {tip_x} (Conținut)", value=f"{scor_text:.1f}%")
             
             # Verificăm discrepanța (Clickbait)
-            # Am păstrat condiția de scor > 40 doar ca factor de diferență, dar verificăm etichetele corect
             if rez_titlu['label'] == "LABEL_1" and rez_text['label'] == "LABEL_0":
                 st.warning("⚠️ **DETECȚIE CLICKBAIT:** Titlul este disproporționat de alarmist față de textul articolului!")
             
             # Scor final mediu
             scor_final = (scor_titlu + scor_text) / 2
             # label_final = "LABEL_1" if scor_final > 50 else "LABEL_0"
-            # NOU: Verdictul final se bazează pe etichetele primite, nu pe pragul de 50
+            # NOU: Verdictul se bazează pe etichete. Dacă ambele sunt informative, finalul e informativ.
             if rez_titlu['label'] == "LABEL_1" or rez_text['label'] == "LABEL_1":
                 label_final = "LABEL_1"
             else:
