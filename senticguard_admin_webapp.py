@@ -47,20 +47,44 @@ if st.button("Aduceți titluri noi"):
         st.session_state.temp_df = pd.DataFrame(new_data)
 
 if "temp_df" in st.session_state:
-    st.info("Schimbă '0' în '1' pentru titlurile alarmiste înainte de salvare.")
-    # Tabel editabil
-    edited_df = st.data_editor(st.session_state.temp_df, use_container_width=True)
-    
-    if st.button("💾 Salvează în Google Drive"):
+    st.write("### 📝 Etichetare Știri")
+    st.info("Bifează știrile care ți se par **Alarmiste**. Cele nebifate vor fi salvate ca 'Informaționale'.")
+
+    # List for new titles
+    updated_labels = []
+
+    # Every title with a checkbox beside
+    for index, row in st.session_state.temp_df.iterrows():
+        # New column for checkbox
+        col1, col2 = st.columns([0.1, 0.9])
+        with col1:
+            is_alarmist = st.checkbox("Alarmist", key=f"check_{index}")
+        with col2:
+            st.write(row["text"])
+        
+        # Save 1 if checked, 0 otherwise
+        updated_labels.append(1 if is_alarmist else 0)
+
+    if st.button("💾 Salvează selecția în Google Drive"):
         try:
-            conn = st.connection("gsheets", type=GSheetsConnection)
-            # Citim baza existentă
-            existing_df = conn.read()
-            # Combinăm
-            updated_df = pd.concat([existing_df, edited_df], ignore_index=True)
-            # Update în Cloud
-            conn.update(data=updated_df)
-            st.success(f"✅ Succes! Am adăugat {len(edited_df)} rânduri în Drive.")
-            del st.session_state.temp_df # Resetăm tabelul după salvare
+            with st.spinner('Se salvează în Drive...'):
+                conn = st.connection("gsheets", type=GSheetsConnection)
+                
+                # Getting data ready using checked values
+                to_save_df = pd.DataFrame({
+                    "text": st.session_state.temp_df["text"],
+                    "label": updated_labels
+                })
+                
+                # Reading file and concatenate
+                existing_df = conn.read()
+                updated_df = pd.concat([existing_df, to_save_df], ignore_index=True)
+                
+                # Update in Cloud
+                conn.update(data=updated_df)
+                
+                st.success(f"✅ Am salvat {len(to_save_df)} știri noi!")
+                del st.session_state.temp_df
+                st.rerun()
         except Exception as e:
-            st.error(f"Eroare la comunicarea cu Google Sheets: {e}")
+            st.error(f"Eroare: {e}")
