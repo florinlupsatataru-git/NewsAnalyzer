@@ -1,1 +1,1 @@
-# NewsAnalyzer
+# Emotional Integrity & Media Resilience Framework
