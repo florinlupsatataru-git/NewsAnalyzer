@@ -23,13 +23,39 @@ if not st.session_state["authenticated"]:
     st.stop()
 
 # 2. Model loading for prediction
+#@st.cache_resource
+#def load_classifier():
+#    model_path = "/content/drive/MyDrive/NewsAnalyzer/model_alarmism_final"
+#    try:
+#        return pipeline("text-classification", model=model_path, tokenizer=model_path)
+#    except:
+#        return None
+
 @st.cache_resource
-def load_classifier():
-    model_path = "/content/drive/MyDrive/NewsAnalyzer/model_alarmism_final"
+def load_trained_model_from_drive():
+    save_path = "./model_temp"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    
+    files = {
+        "config.json": "1kKvuBeOMMiIXF8_UtP3zoI6lxi6RPvo8",
+        "model.safetensors": "1Nrnp84om-EKrNDDdeS8JcYTArwOwusF7", 
+        "tokenizer_config.json": "1If1PxDO6I9-ch55fgqxqFl9X0AHtWwjY",
+        "tokenizer.json": "1e1WkWXewonur2dTuPekixV-liMQhigQi"
+    }
+    
     try:
-        return pipeline("text-classification", model=model_path, tokenizer=model_path)
-    except:
+        for name, file_id in files.items():
+            local_file = os.path.join(save_path, name)
+            if not os.path.exists(local_file): # Descarcă doar dacă nu există deja
+                file_url = f'https://drive.google.com/uc?id={file_id}'
+                gdown.download(file_url, local_file, quiet=True)
+        
+        return pipeline("text-classification", model=save_path, tokenizer=save_path)
+    except Exception as e:
+        st.error(f"Eroare la descărcarea modelului: {e}")
         return None
+
 
 # 3. Admin user interface
 st.title("🚀 Colectare & Validare AI")
