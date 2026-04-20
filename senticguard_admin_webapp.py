@@ -75,16 +75,32 @@ if st.button("Aduceți titluri noi"):
         new_data = []
         for entry in feed.entries[:30]:
             ai_suggested = False
-            if classifier:
-                prediction = classifier(entry.title)[0]
-                # Ajustează LABEL_1 în funcție de cum a mapat modelul tău (de obicei LABEL_1 e pozitiv/alarmist)
-                ai_suggested = True if prediction['label'] == 'LABEL_1' else False
+            ai_score = 0.0
             
+            if classifier:
+                # Prediction
+                prediction = classifier(entry.title)[0]
+                
+                # Label and score extraction (eg: 0.98)
+                label = prediction['label']
+                ai_score = prediction['score']
+                
+                # Check if the model considers it alarmist (LABEL_1)
+                # Note: If the score is for LABEL_0, we invert it to always show
+                # the "alarmist degree" in the interface, or leave it as is for the detected label.
+                if label == 'LABEL_1':
+                    ai_suggested = True
+                else:
+                    ai_suggested = False
+            
+            # Add to temporary list
             new_data.append({
                 "text": entry.title,
-                "ai_suggested": ai_suggested
+                "ai_suggested": ai_suggested,
+                "ai_score": ai_score
             })
         
+        # Save in session_state for later display
         st.session_state.temp_df = pd.DataFrame(new_data)
 
 if "temp_df" in st.session_state:
