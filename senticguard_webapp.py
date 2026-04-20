@@ -1,4 +1,5 @@
 import streamlit as st
+import json
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 from newspaper import Article
 
@@ -31,9 +32,9 @@ query_params = st.query_params
 if "predict_text" in query_params:
     text_to_analyze = query_params["predict_text"]
     
-    if classifier:
+    if cls_pipeline:
         # The AI ​​makes the prediction for the title sent by the extension
-        prediction = classifier(text_to_analyze)[0]
+        prediction = cls_pipeline(text_to_analyze)[0]
         
         # Send result back as JSON text
         st.write(json.dumps(prediction))
