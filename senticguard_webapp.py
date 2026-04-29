@@ -22,6 +22,9 @@ if 'input_text' not in st.session_state:
 
 def sterge_text():
     st.session_state.input_text = ""
+    if 'url_input' in st.session_state:
+        st.session_state.url_input = ""
+    st.rerun()
 
 # --- 4. MODEL LOAD WITH CACHE ---
 @st.cache_resource
