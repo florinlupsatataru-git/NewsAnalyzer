@@ -6,7 +6,7 @@ import os
 from streamlit_gsheets import GSheetsConnection
 from transformers import pipeline
 
-# --- 1. CONFIGURAȚIE CATEGORII ---
+# --- 1. CATEGORIES CONFIG ---
 CATEGORIES_MAP = {
     "OBIECTIV": 0,
     "ALARMIST": 1,
@@ -91,26 +91,32 @@ if st.button("Aduceți titluri noi"):
             new_data.append({"text": entry.title, "ai_label": label_sugerat, "ai_score": scor_ai})
         st.session_state.temp_df = pd.DataFrame(new_data)
 
-# --- 5. ZONA DE VALIDARE ---
+
+# --- 5. VALIDATION ---
 if "temp_df" in st.session_state:
     st.write("### 📝 Analiză și Validare Manuală")
     etichete_validate = []
+    
     for index, row in st.session_state.temp_df.iterrows():
-        st.markdown(f"**Titlu:** {row['text']}")
-
-        col_select, col_score = st.columns([0.3, 0.7]) 
+        st.markdown(f"**{index+1}.** {row['text']}")
+        
+        col_select, col_score = st.columns([0.3, 0.7])
+        
         with col_select:
-           alegere = st.selectbox(
-              f"Label {index}", 
-              options=CATEGORII_LIST,
-              index=index_default,
-              key=f"select_{index}",
-              label_visibility="collapsed"
-           )
+            index_default = CATEGORII_LIST.index(row['ai_label']) if row['ai_label'] in CATEGORII_LIST else 0
+            
+            alegere = st.selectbox(
+                f"Label {index}", 
+                options=CATEGORII_LIST,
+                index=index_default, # Acum variabila este definită exact înainte
+                key=f"select_{index}",
+                label_visibility="collapsed"
+            )
+            
         with col_score:
             conf_color = "🟢" if row['ai_score'] > 0.8 else "🟡" if row['ai_score'] > 0.6 else "🔴"
             st.write(f"{conf_color} **AI:** {row['ai_label']} ({row['ai_score']:.1%})")
-
+        
         etichete_validate.append(CATEGORIES_MAP[alegere])
         st.divider()
 
@@ -128,10 +134,10 @@ if "temp_df" in st.session_state:
         except Exception as e:
             st.error(f"Eroare la salvare: {e}")
 
-# --- SIDEBAR: ADĂUGARE MANUALĂ CU FORMULAR ---
+# --- SIDEBAR: MANUAL ADD ---
 st.sidebar.title("➕ Adăugare Manuală")
 
-# Folosim un formular cu clear_on_submit pentru a evita erorile de session_state
+# Use a form with clear_on_submit to avoid session_state errors
 with st.sidebar.form("manual_add_form", clear_on_submit=True):
     manual_text = st.text_area("Titlu știre nouă:", key="manual_text_input")
     manual_cat = st.selectbox("Categorie:", CATEGORII_LIST)
@@ -150,4 +156,4 @@ with st.sidebar.form("manual_add_form", clear_on_submit=True):
             except Exception as e:
                 st.error(f"Eroare: {e}")
         else:
-            st.warning("Te rugăm să introduci un titlu.")
+            st.warning("Te rog să introduci un titlu.")
