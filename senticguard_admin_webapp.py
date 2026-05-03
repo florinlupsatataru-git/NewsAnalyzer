@@ -15,7 +15,8 @@ CATEGORIES_MAP = {
     "INFORMATIV": 4,
     "OPINIE": 5
 }
-CATEGORII_LIST = list(CATEGORIES_MAP.keys())
+# Added "NU ETICHETA" to allow skipping irrelevant news
+CATEGORII_LIST = ["NU ETICHETA"] + list(CATEGORIES_MAP.keys())
 
 # --- 2. LOGIN AND SECURITY ---
 if "authenticated" not in st.session_state:
@@ -40,7 +41,6 @@ def load_global_data():
     """Reads the dataset from Google Sheets and stores it in session state."""
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        # We read the entire dataset and save it to session_state
         st.session_state.df = conn.read()
     except Exception as e:
         st.error(f"Error connecting to Google Sheets: {e}")
@@ -110,15 +110,18 @@ if st.button("Aduceți titluri noi"):
 # --- 5. VALIDATION ---
 if "temp_df" in st.session_state:
     st.write("### 📝 Analiză și Validare Manuală")
-    etichete_validate = []
+    
+    # Logic to collect only labeled news
+    valid_entries = []
     
     for index, row in st.session_state.temp_df.iterrows():
         st.markdown(f"**{index+1}.** {row['text']}")
         
-        col_select, col_score = st.columns([0.3, 0.7])
+        col_select, col_score = st.columns([0.4, 0.6])
         
         with col_select:
-            index_default = CATEGORII_LIST.index(row['ai_label']) if row['ai_label'] in CATEGORII_LIST else 0
+            # Shift AI index by +1 because "NU ETICHETA" is now at index 0
+            index_default = (list(CATEGORIES_MAP.keys()).index(row['ai_label']) + 1) if row['ai_label'] in CATEGORIES_MAP else 0
 
             alegere = st.selectbox(
                    f"Label {index}", 
@@ -132,26 +135,34 @@ if "temp_df" in st.session_state:
             conf_color = "🟢" if row['ai_score'] > 0.8 else "🟡" if row['ai_score'] > 0.6 else "🔴"
             st.write(f"{conf_color} **AI:** {row['ai_label']} ({row['ai_score']:.1%})")
         
-        etichete_validate.append(CATEGORIES_MAP[alegere])
+        # Only add to list if not skipped
+        if alegere != "NU ETICHETA":
+            valid_entries.append({"text": row['text'], "label": CATEGORIES_MAP[alegere]})
+            
         st.divider()
 
     if st.button("💾 Confirmă și Salvează în Dataset", type="primary"):
-        try:
-            conn = st.connection("gsheets", type=GSheetsConnection)
-            existing_df = conn.read()
-            to_save = pd.DataFrame({"text": st.session_state.temp_df["text"], "label": etichete_validate})
-            updated_df = pd.concat([existing_df, to_save], ignore_index=True)
-            conn.update(data=updated_df)
-            
-            # Update local session state so sidebar counters refresh immediately
-            st.session_state.df = updated_df
-            
-            st.success(f"✅ Am adăugat {len(to_save)} titluri noi!")
-            del st.session_state.temp_df
-            st.cache_resource.clear()
-            st.rerun()
-        except Exception as e:
-            st.error(f"Eroare la salvare: {e}")
+        if not valid_entries:
+            st.warning("⚠️ Nu ai selectat niciun titlu pentru validare (toate sunt setate pe 'NU ETICHETA').")
+        else:
+            try:
+                conn = st.connection("gsheets", type=GSheetsConnection)
+                existing_df = conn.read()
+                
+                # Convert list of valid entries to DataFrame
+                to_save = pd.DataFrame(valid_entries)
+                
+                updated_df = pd.concat([existing_df, to_save], ignore_index=True)
+                conn.update(data=updated_df)
+                
+                # Update local session state for sidebar consistency
+                st.session_state.df = updated_df
+                
+                st.success(f"✅ Am adăugat {len(to_save)} titluri noi! Cele ignorate au fost filtrate.")
+                del st.session_state.temp_df
+                st.rerun()
+            except Exception as e:
+                st.error(f"Eroare la salvare: {e}")
 
 # --- SIDEBAR: LEGEND OF CATEGORIES WITH STATISTICS ---
 
@@ -159,14 +170,9 @@ if "temp_df" in st.session_state:
 counts = {i: 0 for i in range(6)}
 
 if "df" in st.session_state and st.session_state.df is not None:
-    # Ensure label is numeric for correct counting
     temp_df_counts = st.session_state.df.copy()
     temp_df_counts['label'] = pd.to_numeric(temp_df_counts['label'], errors='coerce')
-    
-    # Get value counts as a dictionary
     real_counts = temp_df_counts['label'].value_counts().to_dict()
-    
-    # Update our counts dictionary with real values found in dataset
     for k, v in real_counts.items():
         if k in counts:
             counts[int(k)] = v
@@ -189,10 +195,10 @@ with st.sidebar.expander("Vezi descrierea și statisticile", expanded=True):
 st.sidebar.divider()
 st.sidebar.title("➕ Adăugare Manuală")
 
-# Use a form with clear_on_submit to avoid session_state errors
 with st.sidebar.form("manual_add_form", clear_on_submit=True):
     manual_text = st.text_area("Titlu știre nouă:", key="manual_text_input")
-    manual_cat = st.selectbox("Categorie:", CATEGORII_LIST)
+    # Exclude "NU ETICHETA" from manual add because manual entry implies intent to label
+    manual_cat = st.selectbox("Categorie:", list(CATEGORIES_MAP.keys()))
     submitted = st.form_submit_button("Salvează Titlu")
 
     if submitted:
@@ -203,10 +209,7 @@ with st.sidebar.form("manual_add_form", clear_on_submit=True):
                 new_row = pd.DataFrame({"text": [manual_text], "label": [CATEGORIES_MAP[manual_cat]]})
                 updated_df = pd.concat([existing_df, new_row], ignore_index=True)
                 conn.update(data=updated_df)
-                
-                # Update local session state
                 st.session_state.df = updated_df
-                
                 st.success("✅ Titlu salvat!")
             except Exception as e:
                 st.error(f"Eroare: {e}")
