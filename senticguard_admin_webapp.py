@@ -35,6 +35,21 @@ if not st.session_state["authenticated"]:
     login()
     st.stop()
 
+# --- 2.5 LOAD DATASET GLOBALLY ---
+def load_global_data():
+    """Reads the dataset from Google Sheets and stores it in session state."""
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        # We read the entire dataset and save it to session_state
+        st.session_state.df = conn.read()
+    except Exception as e:
+        st.error(f"Error connecting to Google Sheets: {e}")
+        st.session_state.df = pd.DataFrame(columns=["text", "label"])
+
+# Load data immediately after authentication
+if "df" not in st.session_state:
+    load_global_data()
+
 # --- 3. MODEL LOADING ---
 @st.cache_resource
 def load_classifier():
@@ -127,6 +142,10 @@ if "temp_df" in st.session_state:
             to_save = pd.DataFrame({"text": st.session_state.temp_df["text"], "label": etichete_validate})
             updated_df = pd.concat([existing_df, to_save], ignore_index=True)
             conn.update(data=updated_df)
+            
+            # Update local session state so sidebar counters refresh immediately
+            st.session_state.df = updated_df
+            
             st.success(f"✅ Am adăugat {len(to_save)} titluri noi!")
             del st.session_state.temp_df
             st.cache_resource.clear()
@@ -139,9 +158,18 @@ if "temp_df" in st.session_state:
 # --- CALCULATION OF LABEL DISTRIBUTION ---
 counts = {i: 0 for i in range(6)}
 
-if "df" in st.session_state and not st.session_state.df.empty:
-    real_counts = st.session_state.df['label'].value_counts().to_dict()
-    counts.update(real_counts) # Actualizăm dicționarul nostru cu valorile reale găsite
+if "df" in st.session_state and st.session_state.df is not None:
+    # Ensure label is numeric for correct counting
+    temp_df_counts = st.session_state.df.copy()
+    temp_df_counts['label'] = pd.to_numeric(temp_df_counts['label'], errors='coerce')
+    
+    # Get value counts as a dictionary
+    real_counts = temp_df_counts['label'].value_counts().to_dict()
+    
+    # Update our counts dictionary with real values found in dataset
+    for k, v in real_counts.items():
+        if k in counts:
+            counts[int(k)] = v
 
 st.sidebar.title("📖 Legenda Categoriilor")
 
@@ -175,8 +203,11 @@ with st.sidebar.form("manual_add_form", clear_on_submit=True):
                 new_row = pd.DataFrame({"text": [manual_text], "label": [CATEGORIES_MAP[manual_cat]]})
                 updated_df = pd.concat([existing_df, new_row], ignore_index=True)
                 conn.update(data=updated_df)
+                
+                # Update local session state
+                st.session_state.df = updated_df
+                
                 st.success("✅ Titlu salvat!")
-                # Nu mai este nevoie de st.rerun() sau resetare manuală aici
             except Exception as e:
                 st.error(f"Eroare: {e}")
         else:
