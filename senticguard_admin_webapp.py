@@ -134,17 +134,28 @@ if "temp_df" in st.session_state:
         except Exception as e:
             st.error(f"Eroare la salvare: {e}")
 
-# --- SIDEBAR: CATEGORIES LEGEND ---
+# --- SIDEBAR: LEGEND OF CATEGORIES WITH STATISTICS ---
+
+# --- CALCULATION OF LABEL DISTRIBUTION ---
+counts = {i: 0 for i in range(6)}
+
+if "df" in st.session_state and not st.session_state.df.empty:
+    real_counts = st.session_state.df['label'].value_counts().to_dict()
+    counts.update(real_counts) # Actualizăm dicționarul nostru cu valorile reale găsite
+
 st.sidebar.title("📖 Legenda Categoriilor")
-with st.sidebar.expander("Vezi descrierea etichetelor"):
-    st.markdown("""
-    - **OBIECTIV (0)**: Știri neutre, bazate pe fapte verificate, fără nuanțe emoționale.
-    - **ALARMIST (1)**: Titluri care induc panică, teamă sau folosesc avertismente exagerate.
-    - **SENZAȚIONAL (2)**: Clickbait pur, mizează pe curiozitate sau șoc (ex: "Nu o să crezi").
-    - **CONFLICTUAL (3)**: Scandaluri, certuri, acuzații directe sau dispute între persoane/grupuri.
-    - **INFORMATIV (4)**: Conținut utilitar, ghiduri, prognoze meteo concrete sau anunțuri de interes public.
-    - **OPINIE (5)**: Editoriale, comentarii subiective sau analize semnate de autori.
-    """)
+
+with st.sidebar.expander("Vezi descrierea și statisticile", expanded=True):
+     st.markdown(f"""
+          - **0. OBIECTIV ({int(counts.get(0, 0))}):** Știri neutre, bazate pe fapte verificate, fără nuanțe emoționale.
+          - **1. ALARMIST ({int(counts.get(1, 0))}):** Titluri care induc panică, teamă sau folosesc avertismente exagerate.
+          - **2. SENZAȚIONAL ({int(counts.get(2, 0))}):** Clickbait pur, mizează pe curiozitate sau șoc (ex: "Nu o să crezi").
+          - **3. CONFLICTUAL ({int(counts.get(3, 0))}):** Scandaluri, certuri, acuzații directe sau dispute între persoane/grupuri.
+          - **4. INFORMATIV ({int(counts.get(4, 0))}):** Conținut utilitar, ghiduri, prognoze meteo concrete sau anunțuri de interes public.
+          - **5. OPINIE ({int(counts.get(5, 0))}):** Editoriale, comentarii subiective sau analize semnate de autori.
+          ---
+          **Total în dataset: {len(st.session_state.df) if "df" in st.session_state else 0} înregistrări**
+     """)
 
 # --- SIDEBAR: MANUAL ADD ---
 st.sidebar.divider()
