@@ -140,7 +140,6 @@ with col_logo:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# input container
 with st.container():
     input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
     
@@ -155,9 +154,9 @@ with st.container():
         analyze_clicked = st.button(T["analyze_btn"], type="primary", use_container_width=True)
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
-            # RESET TOTAL: Ștergem toate cheile din memorie
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
+            for key in ["url_input", "manual_input"]:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
 
 # --- 8. RESULTS ---
@@ -165,19 +164,22 @@ if analyze_clicked:
     titlu_analiza = ""
     text_analiza = ""
 
-    if st.session_state.url_input:
+    current_url = st.session_state.get("url_input", "")
+    current_manual = st.session_state.get("manual_input", "")
+
+    if current_url:
         try:
             with st.spinner('Scraping...'):
                 config = Config()
                 config.browser_user_agent = 'Mozilla/5.0...'
-                article = Article(st.session_state.url_input, config=config)
+                article = Article(current_url, config=config)
                 article.download(); article.parse()
                 titlu_analiza = article.title
                 text_analiza = article.text
         except Exception as e:
             st.error(f"{T['error_load']} {e}")
-    elif st.session_state.manual_input:
-        titlu_analiza = st.session_state.manual_input
+    elif current_manual:
+        titlu_analiza = current_manual
 
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
