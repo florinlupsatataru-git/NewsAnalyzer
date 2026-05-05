@@ -87,7 +87,7 @@ CATEGORIES = {
     "OPINIE": "#64748b"
 }
 
-# --- 5. CUSTOM UI STYLING (CSS) ---
+# --- 5. CUSTOM UI STYLING ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -102,15 +102,9 @@ st.markdown(f"""
     }}
     
     .verdict-badge {{ 
-        display: inline-block; 
-        padding: 4px 12px; 
-        border-radius: 6px; 
-        color: white; 
-        font-size: 14px; 
-        font-weight: 700; 
-        text-transform: uppercase; 
-        letter-spacing: 0.5px; 
-        margin-bottom: 10px; 
+        display: inline-block; padding: 4px 12px; border-radius: 6px; 
+        color: white; font-size: 14px; font-weight: 700; 
+        text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; 
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -145,11 +139,7 @@ st.title(T["main_title"])
 col_header, col_logo = st.columns([4, 1])
 with col_header:
     st.markdown(f"#### {T['sub_title']}")
-    st.markdown(f"""
-        <p style="font-size: 0.95rem; color: #475569; line-height: 1.5; margin-top: -10px;">
-            {T['system_desc']}
-        </p>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size: 0.95rem; color: #475569; line-height: 1.5; margin-top: -10px;">{T["system_desc"]}</p>', unsafe_allow_html=True)
 
 with col_logo:
     logo_url = "https://raw.githubusercontent.com/florinlupsatataru-git/SenticGuard/main/icon.png"
@@ -157,57 +147,69 @@ with col_logo:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# THE FIX: Use st.tabs with a key to track which tab is active
 input_container = st.container()
 with input_container:
-    input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
+    tab_titles = [T["tab_link"], T["tab_manual"]]
+    # We use a session state variable to track the active tab index if needed
+    active_tab = st.tabs(tab_titles)
     
     titlu_analiza = ""
     text_analiza = ""
 
-    with input_mode[0]:
+    with active_tab[0]:
         url = st.text_input(T["url_label"], placeholder="https://...", key="url_input")
         if url:
-            # Curatam manual_input folosind metoda sigura
-            if 'manual_input' in st.session_state and st.session_state.manual_input != "":
-                st.session_state.manual_input = ""
             try:
                 config = Config()
-                config.browser_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+                config.browser_user_agent = 'Mozilla/5.0...'
                 article = Article(url, config=config)
                 article.download()
                 article.parse()
-                titlu_analiza = article.title
-                text_analiza = article.text
-                if titlu_analiza:
-                    st.success(f"{T['success_load']} {titlu_analiza}")
+                # We only assign these if we are in this tab when clicking Analyze
+                potential_url_title = article.title
+                potential_url_text = article.text
+                if potential_url_title:
+                    st.success(f"{T['success_load']} {potential_url_title}")
             except Exception as e:
                 st.error(f"{T['error_load']} {e}")
 
-    with input_mode[1]:
+    with active_tab[1]:
         manual_entry = st.text_area(T["manual_label"], height=100, key="manual_input")
-        if manual_entry:
-            # Curatam url_input folosind metoda sigura
-            if 'url_input' in st.session_state and st.session_state.url_input != "":
-                st.session_state.url_input = ""
-            titlu_analiza = manual_entry
-    
+
     c1, c2 = st.columns([1, 5])
     with c1:
+        # THE FIX: Determine which data to use based on which tab's input is filled
+        # and prioritize the one that the user is currently interacting with.
         start_analysis = st.button(T["analyze_btn"], type="primary", use_container_width=True)
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
-            # RESET SIGUR: Stergem cheile din session_state
-            if "url_input" in st.session_state:
-                del st.session_state["url_input"]
-            if "manual_input" in st.session_state:
-                del st.session_state["manual_input"]
+            # Clear everything from session state
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
             st.rerun()
 
-# --- 8. RESULTS ---
+# --- 8. RESULTS LOGIC ---
 if start_analysis:
+    # Logic: if URL is present, use it. If not, use Manual. 
+    # To force separation, we check session_state explicitly.
+    if st.session_state.get("url_input"):
+        # Re-fetch or use data from URL
+        try:
+            article = Article(st.session_state.url_input)
+            article.download(); article.parse()
+            titlu_analiza = article.title
+            text_analiza = article.text
+        except: pass
+    elif st.session_state.get("manual_input"):
+        titlu_analiza = st.session_state.manual_input
+        text_analiza = ""
+
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
     else:
+        # This part effectively clears previous results because it only 
+        # renders when the button is clicked and variables are fresh.
         with st.spinner('AI analysis...'):
             res_titlu = analyze_text(titlu_analiza)
             if res_titlu:
