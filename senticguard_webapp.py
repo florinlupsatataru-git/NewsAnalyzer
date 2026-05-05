@@ -131,6 +131,10 @@ def analyze_text(text):
 # --- 7. USER INTERFACE ---
 st.title(T["main_title"])
 
+# INITIALIZE RESET STATE
+if 'reset_key' not in st.session_state:
+    st.session_state.reset_key = 0
+
 col_header, col_logo = st.columns([4, 1])
 with col_header:
     st.markdown(f"#### {T['sub_title']}")
@@ -143,20 +147,19 @@ st.markdown("<br>", unsafe_allow_html=True)
 with st.container():
     input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
     
+    # Adaugam reset_key la cheia widget-ului. Cand reset_key se schimba, widget-ul se goleste.
     with input_mode[0]:
-        url_val = st.text_input(T["url_label"], placeholder="https://...", key="url_input")
+        url_input = st.text_input(T["url_label"], placeholder="https://...", key=f"url_{st.session_state.reset_key}")
 
     with input_mode[1]:
-        manual_val = st.text_area(T["manual_label"], height=100, key="manual_input")
+        manual_input = st.text_area(T["manual_label"], height=100, key=f"manual_{st.session_state.reset_key}")
     
     c1, c2 = st.columns([1, 5])
     with c1:
         analyze_clicked = st.button(T["analyze_btn"], type="primary", use_container_width=True)
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
-            for key in ["url_input", "manual_input"]:
-                if key in st.session_state:
-                    del st.session_state[key]
+            st.session_state.reset_key += 1
             st.rerun()
 
 # --- 8. RESULTS ---
@@ -164,8 +167,8 @@ if analyze_clicked:
     titlu_analiza = ""
     text_analiza = ""
 
-    current_url = st.session_state.get("url_input", "")
-    current_manual = st.session_state.get("manual_input", "")
+    current_url = st.session_state.get(f"url_{st.session_state.reset_key}", "")
+    current_manual = st.session_state.get(f"manual_{st.session_state.reset_key}", "")
 
     if current_url:
         try:
