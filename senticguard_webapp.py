@@ -29,6 +29,7 @@ TRANSLATIONS = {
         "warn_no_input": "Te rugăm să introduci un URL sau text manual.",
         "confidence": "ÎNCREDERE MODEL:",
         "deep_title": "Deep Analysis: Titlu vs. Conținut",
+        "deep_analysis": "Analiză conținut",
         "mismatch": "Atenție: Discrepanță detectată între tonul titlului și cel al conținutului.",
         "match": "Tonul titlului corespunde cu cel al conținutului.",
         "categories": {
@@ -57,6 +58,7 @@ TRANSLATIONS = {
         "warn_no_input": "Please provide a URL or manual text.",
         "confidence": "MODEL CONFIDENCE:",
         "deep_title": "Deep Analysis: Title vs. Content",
+        "deep_analysis": "Deep Analysis",
         "mismatch": "Attention: Discrepancy detected between title and content tone.",
         "match": "Title tone matches the content tone.",
         "categories": {
@@ -205,8 +207,8 @@ if analyze_clicked:
                 res_content = analyze_text(text_analiza)
                 st.subheader(T["deep_title"])
                 col_r1, col_r2 = st.columns(2)
-                with col_r1: st.metric(T["tab_manual"], res_titlu['label'])
-                with col_r2: st.metric("Deep Analysis", res_content['label'])
+                with col_r1: st.metric(T["manual_label"], res_titlu['label'])
+                with col_r2: st.metric(T["deep_analysis"], res_content['label'])
                 
                 if res_titlu['label'] != res_content['label']:
                     st.warning(T["mismatch"])
