@@ -167,8 +167,7 @@ with input_container:
     with input_mode[0]:
         url = st.text_input(T["url_label"], placeholder="https://...", key="url_input")
         if url:
-            # Curatam input-ul manual cand se introduce un URL
-            if 'manual_input' in st.session_state and st.session_state.manual_input != "":
+            if 'manual_input' in st.session_state:
                 st.session_state.manual_input = ""
             try:
                 config = Config()
@@ -186,8 +185,7 @@ with input_container:
     with input_mode[1]:
         manual_entry = st.text_area(T["manual_label"], height=100, key="manual_input")
         if manual_entry:
-            # Curatam input-ul URL cand se introduce text manual
-            if 'url_input' in st.session_state and st.session_state.url_input != "":
+            if 'url_input' in st.session_state:
                 st.session_state.url_input = ""
             titlu_analiza = manual_entry
     
