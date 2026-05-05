@@ -34,7 +34,7 @@ TRANSLATIONS = {
         "categories": {
             "OBIECTIV": "Informație neutră, bazată pe fapte verificabile.",
             "ALARMIST": "Titlu care induce panică sau teamă exagerată.",
-            "SENZATIONAL": "Creat special pentru a forța click-ul.",
+            "SENZATIONAL": "Creat special pentru a atrage atenția prin exagerări.",
             "CONFLICTUAL": "Subliniază dispute sau tensiuni sociale.",
             "INFORMATIV": "Conținut util, ghiduri sau explicații.",
             "OPINIE": "Punct de vedere subiectiv sau analiză."
@@ -62,7 +62,7 @@ TRANSLATIONS = {
         "categories": {
             "OBIECTIV": "Neutral info, based on verifiable facts.",
             "ALARMIST": "Headlines designed to induce panic or fear.",
-            "SENZATIONAL": "Specifically crafted to force user clicks.",
+            "SENZATIONAL": "Content crafted to attract attention through exaggerations.",
             "CONFLICTUAL": "Highlights disputes or social tensions.",
             "INFORMATIV": "Useful content, guides or explanations.",
             "OPINIE": "Subjective viewpoint or personal analysis."
@@ -88,13 +88,11 @@ CATEGORIES = {
 }
 
 # --- 5. CUSTOM UI STYLING (CSS) ---
-# Added styling for the card-like container without manual DIVs
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
     
-    /* This targets the main analysis container */
     [data-testid="stVerticalBlock"] > div:has(div > .stTabs) {{
         background-color: #ffffff;
         padding: 25px;
@@ -133,11 +131,12 @@ def analyze_text(text):
     if not text or not cls_pipeline:
         return None
     prediction = cls_pipeline(text.strip()[:512])[0]
+    label = prediction['label']
     return {
-        "label": prediction['label'],
+        "label": label,
         "score": float(prediction['score']),
-        "color": CATEGORIES.get(prediction['label'], "#64748b"),
-        "desc": T["categories"].get(prediction['label'], "")
+        "color": CATEGORIES.get(label, "#64748b"),
+        "desc": T["categories"].get(label, "")
     }
 
 # --- 7. USER INTERFACE ---
@@ -153,7 +152,6 @@ with col_header:
     """, unsafe_allow_html=True)
 
 with col_logo:
-    # Ensuring the correct logo URL is used
     logo_url = "https://raw.githubusercontent.com/florinlupsatataru-git/SenticGuard/main/icon.png"
     st.image(logo_url, width=100)
 
@@ -169,6 +167,9 @@ with input_container:
     with input_mode[0]:
         url = st.text_input(T["url_label"], placeholder="https://...", key="url_input")
         if url:
+            # Curatam input-ul manual cand se introduce un URL
+            if 'manual_input' in st.session_state and st.session_state.manual_input != "":
+                st.session_state.manual_input = ""
             try:
                 config = Config()
                 config.browser_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
@@ -185,6 +186,9 @@ with input_container:
     with input_mode[1]:
         manual_entry = st.text_area(T["manual_label"], height=100, key="manual_input")
         if manual_entry:
+            # Curatam input-ul URL cand se introduce text manual
+            if 'url_input' in st.session_state and st.session_state.url_input != "":
+                st.session_state.url_input = ""
             titlu_analiza = manual_entry
     
     c1, c2 = st.columns([1, 5])
@@ -192,6 +196,8 @@ with input_container:
         start_analysis = st.button(T["analyze_btn"], type="primary", use_container_width=True)
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
+            st.session_state.url_input = ""
+            st.session_state.manual_input = ""
             st.rerun()
 
 # --- 8. RESULTS ---
