@@ -167,7 +167,8 @@ with input_container:
     with input_mode[0]:
         url = st.text_input(T["url_label"], placeholder="https://...", key="url_input")
         if url:
-            if 'manual_input' in st.session_state:
+            # Curatam manual_input folosind metoda sigura
+            if 'manual_input' in st.session_state and st.session_state.manual_input != "":
                 st.session_state.manual_input = ""
             try:
                 config = Config()
@@ -185,7 +186,8 @@ with input_container:
     with input_mode[1]:
         manual_entry = st.text_area(T["manual_label"], height=100, key="manual_input")
         if manual_entry:
-            if 'url_input' in st.session_state:
+            # Curatam url_input folosind metoda sigura
+            if 'url_input' in st.session_state and st.session_state.url_input != "":
                 st.session_state.url_input = ""
             titlu_analiza = manual_entry
     
@@ -194,8 +196,11 @@ with input_container:
         start_analysis = st.button(T["analyze_btn"], type="primary", use_container_width=True)
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
-            st.session_state.url_input = ""
-            st.session_state.manual_input = ""
+            # RESET SIGUR: Stergem cheile din session_state
+            if "url_input" in st.session_state:
+                del st.session_state["url_input"]
+            if "manual_input" in st.session_state:
+                del st.session_state["manual_input"]
             st.rerun()
 
 # --- 8. RESULTS ---
