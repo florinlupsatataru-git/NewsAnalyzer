@@ -11,7 +11,6 @@ st.set_page_config(
 )
 
 # --- 2. MULTILINGUAL DICTIONARY ---
-# Centralizing all UI text to support multiple languages
 TRANSLATIONS = {
     "RO": {
         "sidebar_title": "SenticGuard Web v3.1",
@@ -72,11 +71,10 @@ TRANSLATIONS = {
 }
 
 # --- 3. LANGUAGE SELECTION ---
-# Placing the language toggle at the top of the sidebar
 with st.sidebar:
-    st.title(TRANSLATIONS["EN"]["sidebar_title"]) # Title is static or from dict
+    st.title(TRANSLATIONS["EN"]["sidebar_title"])
     lang = st.selectbox("Language / Limbă", ["RO", "EN"], index=0)
-    T = TRANSLATIONS[lang] # Current language dictionary helper
+    T = TRANSLATIONS[lang]
     st.markdown("---")
 
 # --- 4. CATEGORY DEFINITIONS (COLORS) ---
@@ -90,12 +88,32 @@ CATEGORIES = {
 }
 
 # --- 5. CUSTOM UI STYLING (CSS) ---
+# Added styling for the card-like container without manual DIVs
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
-    .main-card {{ background-color: #ffffff; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 20px; }}
-    .verdict-badge {{ display: inline-block; padding: 4px 12px; border-radius: 6px; color: white; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }}
+    
+    /* This targets the main analysis container */
+    [data-testid="stVerticalBlock"] > div:has(div > .stTabs) {{
+        background-color: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }}
+    
+    .verdict-badge {{ 
+        display: inline-block; 
+        padding: 4px 12px; 
+        border-radius: 6px; 
+        color: white; 
+        font-size: 14px; 
+        font-weight: 700; 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px; 
+        margin-bottom: 10px; 
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -112,22 +130,20 @@ def load_model():
 cls_pipeline = load_model()
 
 def analyze_text(text):
-    """Helper to run inference on input text."""
     if not text or not cls_pipeline:
         return None
     prediction = cls_pipeline(text.strip()[:512])[0]
-    return {
+    return {{
         "label": prediction['label'],
         "score": float(prediction['score']),
         "color": CATEGORIES.get(prediction['label'], "#64748b"),
         "desc": T["categories"].get(prediction['label'], "")
-    }
+    }}
 
 # --- 7. USER INTERFACE ---
 st.title(T["main_title"])
 
 col_header, col_logo = st.columns([4, 1])
-
 with col_header:
     st.markdown(f"#### {T['sub_title']}")
     st.markdown(f"""
@@ -137,13 +153,15 @@ with col_header:
     """, unsafe_allow_html=True)
 
 with col_logo:
+    # Ensuring the correct logo URL is used
     logo_url = "https://raw.githubusercontent.com/florinlupsatataru-git/SenticGuard/main/icon.png"
     st.image(logo_url, width=100)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-with st.container():
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
+# THE FIX: Removed the manual DIVs and used a vertical block for the card effect
+input_container = st.container()
+with input_container:
     input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
     
     titlu_analiza = ""
@@ -176,7 +194,6 @@ with st.container():
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 8. RESULTS ---
 if start_analysis:
@@ -204,16 +221,16 @@ if start_analysis:
                     st.markdown("<br>", unsafe_allow_html=True)
                     res_content = analyze_text(text_analiza)
                     st.subheader(T["deep_title"])
-                    col1, col2 = st.columns(2)
-                    with col1: st.metric(T["tab_manual"], res_titlu['label'])
-                    with col2: st.metric("Deep Analysis", res_content['label'])
+                    col_r1, col_r2 = st.columns(2)
+                    with col_r1: st.metric(T["tab_manual"], res_titlu['label'])
+                    with col_r2: st.metric("Deep Analysis", res_content['label'])
                     
                     if res_titlu['label'] != res_content['label']:
                         st.warning(T["mismatch"])
                     else:
                         st.info(T["match"])
 
-# --- 9. SIDEBAR LEGEND (Dynamic) ---
+# --- 9. SIDEBAR LEGEND ---
 with st.sidebar:
     for cat, color in CATEGORIES.items():
         st.markdown(f"""
