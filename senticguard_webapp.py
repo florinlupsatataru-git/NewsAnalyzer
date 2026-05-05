@@ -77,7 +77,7 @@ with st.sidebar:
     T = TRANSLATIONS[lang]
     st.markdown("---")
 
-# --- 4. CATEGORY DEFINITIONS (COLORS) ---
+# --- 4. CATEGORY DEFINITIONS ---
 CATEGORIES = {
     "OBIECTIV": "#10b981",
     "ALARMIST": "#ef4444",
@@ -87,20 +87,15 @@ CATEGORIES = {
     "OPINIE": "#64748b"
 }
 
-# --- 5. CUSTOM UI STYLING (CSS) ---
+# --- 5. CUSTOM UI STYLING ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
-    
     [data-testid="stVerticalBlock"] > div:has(div > .stTabs) {{
-        background-color: #ffffff;
-        padding: 25px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        background-color: #ffffff; padding: 25px; border-radius: 12px;
+        border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }}
-    
     .verdict-badge {{ 
         display: inline-block; padding: 4px 12px; border-radius: 6px; 
         color: white; font-size: 14px; font-weight: 700; 
@@ -139,67 +134,51 @@ st.title(T["main_title"])
 col_header, col_logo = st.columns([4, 1])
 with col_header:
     st.markdown(f"#### {T['sub_title']}")
-    st.markdown(f'<p style="font-size: 0.95rem; color: #475569; line-height: 1.5; margin-top: -10px;">{T["system_desc"]}</p>', unsafe_allow_html=True)
-
+    st.markdown(f'<p style="font-size: 0.95rem; color: #475569;">{T["system_desc"]}</p>', unsafe_allow_html=True)
 with col_logo:
-    logo_url = "https://raw.githubusercontent.com/florinlupsatataru-git/SenticGuard/main/icon.png"
-    st.image(logo_url, width=100)
+    st.image("https://raw.githubusercontent.com/florinlupsatataru-git/SenticGuard/main/icon.png", width=100)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-if 'active_tab' not in st.session_state:
-    st.session_state.active_tab = T["tab_link"]
+# input container
+with st.container():
+    input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
+    
+    with input_mode[0]:
+        url_val = st.text_input(T["url_label"], placeholder="https://...", key="url_input")
 
-# Afișăm tab-urile
-input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
+    with input_mode[1]:
+        manual_val = st.text_area(T["manual_label"], height=100, key="manual_input")
+    
+    c1, c2 = st.columns([1, 5])
+    with c1:
+        analyze_clicked = st.button(T["analyze_btn"], type="primary", use_container_width=True)
+    with c2:
+        if st.button(T["reset_btn"], type="secondary"):
+            # RESET TOTAL: Ștergem toate cheile din memorie
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
 
-titlu_analiza = ""
-text_analiza = ""
-
-with input_mode[0]:
-    url_input = st.text_input(T["url_label"], placeholder="https://...", key="url_widget")
-    # Dacă utilizatorul scrie aici, setăm tab-ul activ pe Link
-    if url_input:
-        st.session_state.active_tab = "LINK"
-
-with input_mode[1]:
-    manual_input = st.text_area(T["manual_label"], height=100, key="manual_widget")
-    # Dacă utilizatorul scrie aici, setăm tab-ul activ pe Manual
-    if manual_input:
-        st.session_state.active_tab = "MANUAL"
-
-c1, c2 = st.columns([1, 5])
-with c1:
-    btn_click = st.button(T["analyze_btn"], type="primary", use_container_width=True)
-with c2:
-    if st.button(T["reset_btn"], type="secondary"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
-
-# --- 8. STRICT ANALYSIS LOGIC ---
-if btn_click:
+# --- 8. RESULTS ---
+if analyze_clicked:
     titlu_analiza = ""
     text_analiza = ""
 
-    if st.session_state.active_tab == "LINK" and st.session_state.url_widget:
-        with st.spinner('Scraping article...'):
-            try:
+    if st.session_state.url_input:
+        try:
+            with st.spinner('Scraping...'):
                 config = Config()
                 config.browser_user_agent = 'Mozilla/5.0...'
-                article = Article(st.session_state.url_widget, config=config)
-                article.download()
-                article.parse()
+                article = Article(st.session_state.url_input, config=config)
+                article.download(); article.parse()
                 titlu_analiza = article.title
                 text_analiza = article.text
-            except Exception as e:
-                st.error(f"{T['error_load']} {e}")
-    
-    elif st.session_state.active_tab == "MANUAL" and st.session_state.manual_widget:
-        titlu_analiza = st.session_state.manual_widget
-        text_analiza = ""
+        except Exception as e:
+            st.error(f"{T['error_load']} {e}")
+    elif st.session_state.manual_input:
+        titlu_analiza = st.session_state.manual_input
 
-    # Show results
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
     else:
@@ -223,9 +202,9 @@ if btn_click:
                 st.markdown("<br>", unsafe_allow_html=True)
                 res_content = analyze_text(text_analiza)
                 st.subheader(T["deep_title"])
-                col1, col2 = st.columns(2)
-                with col1: st.metric(T["tab_manual"], res_titlu['label'])
-                with col2: st.metric("Deep Analysis", res_content['label'])
+                col_r1, col_r2 = st.columns(2)
+                with col_r1: st.metric(T["tab_manual"], res_titlu['label'])
+                with col_r2: st.metric("Deep Analysis", res_content['label'])
                 
                 if res_titlu['label'] != res_content['label']:
                     st.warning(T["mismatch"])
@@ -235,9 +214,4 @@ if btn_click:
 # --- 9. SIDEBAR LEGEND ---
 with st.sidebar:
     for cat, color in CATEGORIES.items():
-        st.markdown(f"""
-        <div style="margin-bottom: 15px;">
-            <span style="color:{color}; font-weight:bold;">{cat}</span><br>
-            <small style="color:#64748b;">{T['categories'].get(cat, "")}</small>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div style="margin-bottom: 15px;"><span style="color:{color}; font-weight:bold;">{cat}</span><br><small style="color:#64748b;">{T["categories"].get(cat, "")}</small></div>', unsafe_allow_html=True)
