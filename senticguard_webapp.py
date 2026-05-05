@@ -34,7 +34,7 @@ TRANSLATIONS = {
         "categories": {
             "OBIECTIV": "Informație neutră, bazată pe fapte verificabile.",
             "ALARMIST": "Titlu care induce panică sau teamă exagerată.",
-            "CLICKBAIT": "Creat special pentru a forța click-ul.",
+            "SENZATIONAL": "Creat special pentru a forța click-ul.",
             "CONFLICTUAL": "Subliniază dispute sau tensiuni sociale.",
             "INFORMATIV": "Conținut util, ghiduri sau explicații.",
             "OPINIE": "Punct de vedere subiectiv sau analiză."
@@ -62,7 +62,7 @@ TRANSLATIONS = {
         "categories": {
             "OBIECTIV": "Neutral info, based on verifiable facts.",
             "ALARMIST": "Headlines designed to induce panic or fear.",
-            "CLICKBAIT": "Specifically crafted to force user clicks.",
+            "SENZATIONAL": "Specifically crafted to force user clicks.",
             "CONFLICTUAL": "Highlights disputes or social tensions.",
             "INFORMATIV": "Useful content, guides or explanations.",
             "OPINIE": "Subjective viewpoint or personal analysis."
@@ -81,7 +81,7 @@ with st.sidebar:
 CATEGORIES = {
     "OBIECTIV": "#10b981",
     "ALARMIST": "#ef4444",
-    "CLICKBAIT": "#f59e0b",
+    "SENZATIONAL": "#f59e0b",
     "CONFLICTUAL": "#8b5cf6",
     "INFORMATIV": "#3b82f6",
     "OPINIE": "#64748b"
