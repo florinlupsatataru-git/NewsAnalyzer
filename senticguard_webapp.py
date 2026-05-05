@@ -87,7 +87,7 @@ CATEGORIES = {
     "OPINIE": "#64748b"
 }
 
-# --- 5. CUSTOM UI STYLING ---
+# --- 5. CUSTOM UI STYLING (CSS) ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -147,98 +147,90 @@ with col_logo:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# THE FIX: Use st.tabs with a key to track which tab is active
-input_container = st.container()
-with input_container:
-    tab_titles = [T["tab_link"], T["tab_manual"]]
-    # We use a session state variable to track the active tab index if needed
-    active_tab = st.tabs(tab_titles)
-    
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = T["tab_link"]
+
+# Afișăm tab-urile
+input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
+
+titlu_analiza = ""
+text_analiza = ""
+
+with input_mode[0]:
+    url_input = st.text_input(T["url_label"], placeholder="https://...", key="url_widget")
+    # Dacă utilizatorul scrie aici, setăm tab-ul activ pe Link
+    if url_input:
+        st.session_state.active_tab = "LINK"
+
+with input_mode[1]:
+    manual_input = st.text_area(T["manual_label"], height=100, key="manual_widget")
+    # Dacă utilizatorul scrie aici, setăm tab-ul activ pe Manual
+    if manual_input:
+        st.session_state.active_tab = "MANUAL"
+
+c1, c2 = st.columns([1, 5])
+with c1:
+    btn_click = st.button(T["analyze_btn"], type="primary", use_container_width=True)
+with c2:
+    if st.button(T["reset_btn"], type="secondary"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+# --- 8. STRICT ANALYSIS LOGIC ---
+if btn_click:
     titlu_analiza = ""
     text_analiza = ""
 
-    with active_tab[0]:
-        url = st.text_input(T["url_label"], placeholder="https://...", key="url_input")
-        if url:
+    if st.session_state.active_tab == "LINK" and st.session_state.url_widget:
+        with st.spinner('Scraping article...'):
             try:
                 config = Config()
                 config.browser_user_agent = 'Mozilla/5.0...'
-                article = Article(url, config=config)
+                article = Article(st.session_state.url_widget, config=config)
                 article.download()
                 article.parse()
-                # We only assign these if we are in this tab when clicking Analyze
-                potential_url_title = article.title
-                potential_url_text = article.text
-                if potential_url_title:
-                    st.success(f"{T['success_load']} {potential_url_title}")
+                titlu_analiza = article.title
+                text_analiza = article.text
             except Exception as e:
                 st.error(f"{T['error_load']} {e}")
-
-    with active_tab[1]:
-        manual_entry = st.text_area(T["manual_label"], height=100, key="manual_input")
-
-    c1, c2 = st.columns([1, 5])
-    with c1:
-        # THE FIX: Determine which data to use based on which tab's input is filled
-        # and prioritize the one that the user is currently interacting with.
-        start_analysis = st.button(T["analyze_btn"], type="primary", use_container_width=True)
-    with c2:
-        if st.button(T["reset_btn"], type="secondary"):
-            # Clear everything from session state
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
-
-# --- 8. RESULTS LOGIC ---
-if start_analysis:
-    # Logic: if URL is present, use it. If not, use Manual. 
-    # To force separation, we check session_state explicitly.
-    if st.session_state.get("url_input"):
-        # Re-fetch or use data from URL
-        try:
-            article = Article(st.session_state.url_input)
-            article.download(); article.parse()
-            titlu_analiza = article.title
-            text_analiza = article.text
-        except: pass
-    elif st.session_state.get("manual_input"):
-        titlu_analiza = st.session_state.manual_input
+    
+    elif st.session_state.active_tab == "MANUAL" and st.session_state.manual_widget:
+        titlu_analiza = st.session_state.manual_widget
         text_analiza = ""
 
+    # Show Results
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
     else:
-        # This part effectively clears previous results because it only 
-        # renders when the button is clicked and variables are fresh.
-        with st.spinner('AI analysis...'):
-            res_titlu = analyze_text(titlu_analiza)
-            if res_titlu:
-                st.markdown(f"""
-                    <div style="background: white; border: 1px solid #e2e8f0; padding: 25px; border-radius: 12px; border-top: 5px solid {res_titlu['color']};">
-                        <div class="verdict-badge" style="background-color: {res_titlu['color']};">
-                            {res_titlu['label']}
-                        </div>
-                        <h3 style="margin-top: 0; color: #0f172a;">{titlu_analiza}</h3>
-                        <p style="color: #64748b; font-size: 15px;">{res_titlu['desc']}</p>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 20px;">
-                            <span style="font-size: 13px; font-weight: 600; color: #94a3b8;">{T['confidence']}</span>
-                            <span style="font-size: 13px; font-weight: 700; color: {res_titlu['color']};">{res_titlu['score']:.2%}</span>
-                        </div>
+        res_titlu = analyze_text(titlu_analiza)
+        if res_titlu:
+            st.markdown(f"""
+                <div style="background: white; border: 1px solid #e2e8f0; padding: 25px; border-radius: 12px; border-top: 5px solid {res_titlu['color']};">
+                    <div class="verdict-badge" style="background-color: {res_titlu['color']};">
+                        {res_titlu['label']}
                     </div>
-                """, unsafe_allow_html=True)
+                    <h3 style="margin-top: 0; color: #0f172a;">{titlu_analiza}</h3>
+                    <p style="color: #64748b; font-size: 15px;">{res_titlu['desc']}</p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 20px;">
+                        <span style="font-size: 13px; font-weight: 600; color: #94a3b8;">{T['confidence']}</span>
+                        <span style="font-size: 13px; font-weight: 700; color: {res_titlu['color']};">{res_titlu['score']:.2%}</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
-                if text_analiza:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    res_content = analyze_text(text_analiza)
-                    st.subheader(T["deep_title"])
-                    col_r1, col_r2 = st.columns(2)
-                    with col_r1: st.metric(T["tab_manual"], res_titlu['label'])
-                    with col_r2: st.metric("Deep Analysis", res_content['label'])
-                    
-                    if res_titlu['label'] != res_content['label']:
-                        st.warning(T["mismatch"])
-                    else:
-                        st.info(T["match"])
+            if text_analiza:
+                st.markdown("<br>", unsafe_allow_html=True)
+                res_content = analyze_text(text_analiza)
+                st.subheader(T["deep_title"])
+                col1, col2 = st.columns(2)
+                with col1: st.metric(T["tab_manual"], res_titlu['label'])
+                with col2: st.metric("Deep Analysis", res_content['label'])
+                
+                if res_titlu['label'] != res_content['label']:
+                    st.warning(T["mismatch"])
+                else:
+                    st.info(T["match"])
 
 # --- 9. SIDEBAR LEGEND ---
 with st.sidebar:
