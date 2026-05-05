@@ -18,6 +18,7 @@ TRANSLATIONS = {
         "lang_select": "Alege Limba / Select Language",
         "main_title": "SenticGuard AI",
         "sub_title": "Integritate Media și Analiză Deep",
+        "system_desc": "SenticGuard este un sistem inteligent conceput pentru a identifica tiparele de manipulare emoțională, senzaționalism și dezinformare din fluxurile de știri din România, utilizând tehnologia NLP.",
         "tab_link": "Link Articol",
         "tab_manual": "Text Manual",
         "url_label": "URL Articol:",
@@ -45,6 +46,7 @@ TRANSLATIONS = {
         "lang_select": "Select Language",
         "main_title": "SenticGuard AI",
         "sub_title": "Media Integrity & Deep Analysis",
+        "system_desc": "SenticGuard is an intelligent system designed to identify patterns of emotional manipulation, sensationalism, and disinformation in Romanian news feeds using NLP technology.",
         "tab_link": "Article Link",
         "tab_manual": "Manual Text",
         "url_label": "Article URL:",
@@ -123,7 +125,22 @@ def analyze_text(text):
 
 # --- 7. USER INTERFACE ---
 st.title(T["main_title"])
-st.markdown(f"#### {T['sub_title']}")
+
+col_header, col_logo = st.columns([4, 1])
+
+with col_header:
+    st.markdown(f"#### {T['sub_title']}")
+    st.markdown(f"""
+        <p style="font-size: 0.95rem; color: #475569; line-height: 1.5; margin-top: -10px;">
+            {T['system_desc']}
+        </p>
+    """, unsafe_allow_html=True)
+
+with col_logo:
+    logo_url = "https://raw.githubusercontent.com/florinlupsatataru-git/SenticGuard/main/icon.png"
+    st.image(logo_url, width=100)
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 with st.container():
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
