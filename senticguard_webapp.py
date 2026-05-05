@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # --- 2. MULTILINGUAL DICTIONARY ---
-# imported from senticguard_translations
+# Imported from senticguard_translations
 
 # --- 3. LANGUAGE SELECTION ---
 with st.sidebar:
@@ -48,7 +48,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 6. MODEL INITIALIZATION ---
+# --- 6. MODEL INITIALIZATION & LOGIC ---
 @st.cache_resource
 def load_model():
     model_path = "florin-lupsa/NewsAnalyzer" 
@@ -72,10 +72,22 @@ def analyze_text(text):
         "desc": T["categories"].get(label, "")
     }
 
+def get_final_verdict(res_titlu, res_content):
+    """Calculează verdictul final ponderat între titlu și conținut."""
+    if not res_content:
+        return res_titlu
+    
+    if res_titlu['label'] == res_content['label']:
+        return res_content
+    
+    if res_titlu['score'] > 0.90:
+        return res_titlu
+        
+    return res_content
+
 # --- 7. USER INTERFACE ---
 st.title(T["main_title"])
 
-# INITIALIZE STATE
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
 
@@ -91,9 +103,6 @@ st.markdown("<br>", unsafe_allow_html=True)
 analysis_mode = st.radio("Sursă Date:", [T["tab_link"], T["tab_manual"]], horizontal=True, label_visibility="collapsed")
 
 with st.container():
-    titlu_analiza = ""
-    text_analiza = ""
-
     if analysis_mode == T["tab_link"]:
         url_input = st.text_input(T["url_label"], placeholder="https://...", key=f"url_{st.session_state.reset_key}")
     else:
@@ -115,7 +124,7 @@ if analyze_clicked:
     current_url = st.session_state.get(f"url_{st.session_state.reset_key}", "")
     current_manual = st.session_state.get(f"manual_{st.session_state.reset_key}", "")
 
-    if current_url:
+    if analysis_mode == T["tab_link"] and current_url:
         try:
             with st.spinner('Scraping...'):
                 config = Config()
@@ -126,31 +135,34 @@ if analyze_clicked:
                 text_analiza = article.text
         except Exception as e:
             st.error(f"{T['error_load']} {e}")
-    elif current_manual:
+    elif analysis_mode == T["tab_manual"] and current_manual:
         titlu_analiza = current_manual
 
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
     else:
         res_titlu = analyze_text(titlu_analiza)
+        res_content = analyze_text(text_analiza) if text_analiza else None
+        
+        verdict_final = get_final_verdict(res_titlu, res_content)
+
         if res_titlu:
             st.markdown(f"""
-                <div style="background: white; border: 1px solid #e2e8f0; padding: 25px; border-radius: 12px; border-top: 5px solid {res_titlu['color']};">
-                    <div class="verdict-badge" style="background-color: {res_titlu['color']};">
-                        {res_titlu['label']}
+                <div style="background: white; border: 1px solid #e2e8f0; padding: 25px; border-radius: 12px; border-top: 5px solid {verdict_final['color']};">
+                    <div class="verdict-badge" style="background-color: {verdict_final['color']};">
+                        VERDICT: {verdict_final['label']}
                     </div>
                     <h3 style="margin-top: 0; color: #0f172a;">{titlu_analiza}</h3>
-                    <p style="color: #64748b; font-size: 15px;">{res_titlu['desc']}</p>
+                    <p style="color: #64748b; font-size: 15px;">{verdict_final['desc']}</p>
                     <div style="display: flex; align-items: center; gap: 10px; margin-top: 20px;">
                         <span style="font-size: 13px; font-weight: 600; color: #94a3b8;">{T['confidence']}</span>
-                        <span style="font-size: 13px; font-weight: 700; color: {res_titlu['color']};">{res_titlu['score']:.2%}</span>
+                        <span style="font-size: 13px; font-weight: 700; color: {verdict_final['color']};">{verdict_final['score']:.2%}</span>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
 
             if text_analiza:
                 st.markdown("<br>", unsafe_allow_html=True)
-                res_content = analyze_text(text_analiza)
                 st.subheader(T["deep_title"])
                 
                 col_r1, col_r2 = st.columns(2)
