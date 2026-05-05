@@ -131,7 +131,7 @@ def analyze_text(text):
 # --- 7. USER INTERFACE ---
 st.title(T["main_title"])
 
-# INITIALIZE RESET STATE
+# INITIALIZE STATE
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
 
@@ -144,14 +144,15 @@ with col_logo:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-with st.container():
-    input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
-    
-    # Adaugam reset_key la cheia widget-ului. Cand reset_key se schimba, widget-ul se goleste.
-    with input_mode[0]:
-        url_input = st.text_input(T["url_label"], placeholder="https://...", key=f"url_{st.session_state.reset_key}")
+analysis_mode = st.radio("Sursă Date:", [T["tab_link"], T["tab_manual"]], horizontal=True, label_visibility="collapsed")
 
-    with input_mode[1]:
+with st.container():
+    titlu_analiza = ""
+    text_analiza = ""
+
+    if analysis_mode == T["tab_link"]:
+        url_input = st.text_input(T["url_label"], placeholder="https://...", key=f"url_{st.session_state.reset_key}")
+    else:
         manual_input = st.text_area(T["manual_label"], height=100, key=f"manual_{st.session_state.reset_key}")
     
     c1, c2 = st.columns([1, 5])
@@ -164,25 +165,21 @@ with st.container():
 
 # --- 8. RESULTS ---
 if analyze_clicked:
-    titlu_analiza = ""
-    text_analiza = ""
-
-    current_url = st.session_state.get(f"url_{st.session_state.reset_key}", "")
-    current_manual = st.session_state.get(f"manual_{st.session_state.reset_key}", "")
-
-    if current_url:
-        try:
-            with st.spinner('Scraping...'):
-                config = Config()
-                config.browser_user_agent = 'Mozilla/5.0...'
-                article = Article(current_url, config=config)
-                article.download(); article.parse()
-                titlu_analiza = article.title
-                text_analiza = article.text
-        except Exception as e:
-            st.error(f"{T['error_load']} {e}")
-    elif current_manual:
-        titlu_analiza = current_manual
+    if analysis_mode == T["tab_link"]:
+        current_url = st.session_state.get(f"url_{st.session_state.reset_key}", "")
+        if current_url:
+            try:
+                with st.spinner('Scraping...'):
+                    config = Config()
+                    config.browser_user_agent = 'Mozilla/5.0...'
+                    article = Article(current_url, config=config)
+                    article.download(); article.parse()
+                    titlu_analiza = article.title
+                    text_analiza = article.text
+            except Exception as e:
+                st.error(f"{T['error_load']} {e}")
+    else:
+        titlu_analiza = st.session_state.get(f"manual_{st.session_state.reset_key}", "")
 
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
