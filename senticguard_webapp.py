@@ -109,21 +109,25 @@ with st.container():
 
 # --- 8. RESULTS ---
 if analyze_clicked:
-    if analysis_mode == T["tab_link"]:
-        current_url = st.session_state.get(f"url_{st.session_state.reset_key}", "")
-        if current_url:
-            try:
-                with st.spinner('Scraping...'):
-                    config = Config()
-                    config.browser_user_agent = 'Mozilla/5.0...'
-                    article = Article(current_url, config=config)
-                    article.download(); article.parse()
-                    titlu_analiza = article.title
-                    text_analiza = article.text
-            except Exception as e:
-                st.error(f"{T['error_load']} {e}")
-    else:
-        titlu_analiza = st.session_state.get(f"manual_{st.session_state.reset_key}", "")
+    titlu_analiza = ""
+    text_analiza = ""
+
+    current_url = st.session_state.get(f"url_{st.session_state.reset_key}", "")
+    current_manual = st.session_state.get(f"manual_{st.session_state.reset_key}", "")
+
+    if current_url:
+        try:
+            with st.spinner('Scraping...'):
+                config = Config()
+                config.browser_user_agent = 'Mozilla/5.0...'
+                article = Article(current_url, config=config)
+                article.download(); article.parse()
+                titlu_analiza = article.title
+                text_analiza = article.text
+        except Exception as e:
+            st.error(f"{T['error_load']} {e}")
+    elif current_manual:
+        titlu_analiza = current_manual
 
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
@@ -148,9 +152,16 @@ if analyze_clicked:
                 st.markdown("<br>", unsafe_allow_html=True)
                 res_content = analyze_text(text_analiza)
                 st.subheader(T["deep_title"])
+                
                 col_r1, col_r2 = st.columns(2)
-                with col_r1: st.metric(T["manual_label"], res_titlu['label'])
-                with col_r2: st.metric(T["deep_analysis"], res_content['label'])
+                
+                with col_r1: 
+                    st.metric(T["manual_label"], res_titlu['label'])
+                    st.caption(f"{T['confidence']} {res_titlu['score']:.2%}")
+                
+                with col_r2: 
+                    st.metric(T["deep_analysis"], res_content['label'])
+                    st.caption(f"{T['confidence']} {res_content['score']:.2%}")
                 
                 if res_titlu['label'] != res_content['label']:
                     st.warning(T["mismatch"])
