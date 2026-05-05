@@ -133,12 +133,12 @@ def analyze_text(text):
     if not text or not cls_pipeline:
         return None
     prediction = cls_pipeline(text.strip()[:512])[0]
-    return {{
+    return {
         "label": prediction['label'],
         "score": float(prediction['score']),
         "color": CATEGORIES.get(prediction['label'], "#64748b"),
         "desc": T["categories"].get(prediction['label'], "")
-    }}
+    }
 
 # --- 7. USER INTERFACE ---
 st.title(T["main_title"])
@@ -159,7 +159,6 @@ with col_logo:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# THE FIX: Removed the manual DIVs and used a vertical block for the card effect
 input_container = st.container()
 with input_container:
     input_mode = st.tabs([T["tab_link"], T["tab_manual"]])
