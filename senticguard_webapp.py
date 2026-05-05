@@ -199,7 +199,7 @@ if btn_click:
         titlu_analiza = st.session_state.manual_widget
         text_analiza = ""
 
-    # Show Results
+    # Show results
     if not titlu_analiza:
         st.warning(T["warn_no_input"])
     else:
