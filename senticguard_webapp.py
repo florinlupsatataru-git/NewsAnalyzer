@@ -20,16 +20,16 @@ st.set_page_config(
 # --- 2. LOGGING FUNCTION ---
 def log_analysis(input_data, verdict, score, mode):
     """
-    Saves analysis metadata to a Google Sheet named 'Logs' for administrative tracking.
+    Saves analysis metadata. 
+    'source' stores the domain, 'detail' stores the full URL/text.
     """
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        # Force read with ttl=0 to ensure we don't overwrite concurrent logs
         existing_logs = conn.read(worksheet="Logs", ttl=0)
         
-        # Extract domain if it's a URL, otherwise mark as 'Manual'
         domain = "Manual Input"
         if mode == "Link" and input_data.startswith("http"):
+            # Extrage 'site.ro' din 'https://www.site.ro/articol'
             domain = input_data.split('/')[2].replace('www.', '')
 
         new_log = pd.DataFrame([{
@@ -37,13 +37,13 @@ def log_analysis(input_data, verdict, score, mode):
             "source": domain,
             "verdict": verdict,
             "confidence": round(score, 4),
-            "mode": mode
+            "mode": mode,
+            "detail": input_data
         }])
         
         updated_df = pd.concat([existing_logs, new_log], ignore_index=True)
         conn.update(worksheet="Logs", data=updated_df)
-    except Exception as e:
-        # Silently fail logging so it doesn't break the user experience
+    except Exception:
         pass
 
 # --- 3. LANGUAGE SELECTION & SESSION STATE ---
