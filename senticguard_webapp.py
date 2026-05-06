@@ -29,7 +29,19 @@ with st.sidebar:
     T = TRANSLATIONS[lang]
     st.markdown("---")
 
-# --- 3. CATEGORY DEFINITIONS (COLORS) ---
+# --- 3. DEEP LINKING LOGIC (Capturing External Parameters) ---
+# Check for URL parameters (e.g., ?url=https://site.com)
+query_params = st.query_params
+external_url = query_params.get("url")
+
+# Set a trigger flag if an external URL is provided and not yet analyzed in this session
+if external_url and 'auto_analyzed' not in st.session_state:
+    st.session_state.auto_analyzed = external_url
+    trigger_external = True
+else:
+    trigger_external = False
+
+# --- 4. CATEGORY DEFINITIONS (COLORS) ---
 CATEGORIES = {
     "OBIECTIV": "#10b981",
     "ALARMIST": "#ef4444",
@@ -39,7 +51,7 @@ CATEGORIES = {
     "OPINIE": "#64748b"
 }
 
-# --- 4. CUSTOM UI STYLING ---
+# --- 5. CUSTOM UI STYLING ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -61,7 +73,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 5. MODEL INITIALIZATION & LOGIC ---
+# --- 6. MODEL INITIALIZATION & LOGIC ---
 @st.cache_resource
 def load_model():
     """Load the classification pipeline from the HuggingFace Hub."""
@@ -125,7 +137,7 @@ def get_final_verdict(res_titlu, res_content):
     
     return verdict_final
 
-# --- 6. USER INTERFACE ---
+# --- 7. USER INTERFACE ---
 st.title(T["main_title"])
 
 col_header, col_logo = st.columns([4, 1])
@@ -141,19 +153,28 @@ analysis_mode = st.radio("Source:", [T["tab_link"], T["tab_manual"]], horizontal
 
 with st.container():
     if analysis_mode == T["tab_link"]:
-        input_data = st.text_input(T["url_label"], placeholder="https://...", key=f"url_{st.session_state.reset_key}")
+        # Populate with external URL if present, otherwise empty
+        default_val = external_url if external_url else ""
+        input_data = st.text_input(T["url_label"], value=default_val, placeholder="https://...", key=f"url_{st.session_state.reset_key}")
     else:
         input_data = st.text_area(T["manual_label"], height=100, key=f"manual_{st.session_state.reset_key}")
     
     c1, c2 = st.columns([1, 5])
     with c1:
+        # Trigger analysis if button clicked OR if deep linking is active
         analyze_clicked = st.button(T["analyze_btn"], type="primary", use_container_width=True)
+        if trigger_external:
+            analyze_clicked = True
+            
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
+            # Clear auto_analyzed flag on manual reset
+            if 'auto_analyzed' in st.session_state:
+                del st.session_state.auto_analyzed
             st.session_state.reset_key += 1
             st.rerun()
 
-# --- 7. PROCESSING & RESULTS ---
+# --- 8. PROCESSING & RESULTS ---
 if analyze_clicked:
     titlu_analiza = ""
     text_analiza = ""
@@ -179,6 +200,7 @@ if analyze_clicked:
         res_content = analyze_text(text_analiza) if text_analiza else None
         verdict_final = get_final_verdict(res_titlu, res_content)
 
+        # MAIN VERDICT CARD
         st.markdown(f"""
             <div class="verdict-card" style="border-top: 5px solid {verdict_final['color']};">
                 <div class="verdict-badge" style="background-color: {verdict_final['color']};">
@@ -209,7 +231,7 @@ if analyze_clicked:
             st.write(f"**{T['tech_final_label']}** {verdict_final['score']:.2%}")
             st.caption(f"{T['tech_config_label']} {WEIGHT_CONTENT*100:.0f}% {T['weight_content_text']} / {WEIGHT_TITLE*100:.0f}% {T['weight_title_text']}")
 
-# --- 8. SIDEBAR LEGEND ---
+# --- 9. SIDEBAR LEGEND ---
 with st.sidebar:
     st.markdown("---")
     for cat, color in CATEGORIES.items():
