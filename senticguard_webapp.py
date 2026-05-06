@@ -1,11 +1,12 @@
 import streamlit as st
 import random
+import pandas as pd
 from transformers import pipeline
 from newspaper import Article, Config
+from streamlit_gsheets import GSheetsConnection
 from senticguard_translations import TRANSLATIONS
 
 # --- 1. CONFIGURATION & CONSTANTS ---
-# Internal weights for the hybrid algorithm
 WEIGHT_CONTENT = 0.7 
 WEIGHT_TITLE = 0.3
 
@@ -16,7 +17,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. LANGUAGE SELECTION & SESSION STATE ---
+# --- 2. LOGGING FUNCTION ---
+def log_analysis(input_data, verdict, score, mode):
+    """
+    Saves analysis metadata to a Google Sheet named 'Logs' for administrative tracking.
+    """
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        # Force read with ttl=0 to ensure we don't overwrite concurrent logs
+        existing_logs = conn.read(worksheet="Logs", ttl=0)
+        
+        # Extract domain if it's a URL, otherwise mark as 'Manual'
+        domain = "Manual Input"
+        if mode == "Link" and input_data.startswith("http"):
+            domain = input_data.split('/')[2].replace('www.', '')
+
+        new_log = pd.DataFrame([{
+            "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "source": domain,
+            "verdict": verdict,
+            "confidence": round(score, 4),
+            "mode": mode
+        }])
+        
+        updated_df = pd.concat([existing_logs, new_log], ignore_index=True)
+        conn.update(worksheet="Logs", data=updated_df)
+    except Exception as e:
+        # Silently fail logging so it doesn't break the user experience
+        pass
+
+# --- 3. LANGUAGE SELECTION & SESSION STATE ---
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
 
@@ -24,24 +54,22 @@ with st.sidebar:
     if 'lang_idx' not in st.session_state:
         st.session_state.lang_idx = 0
         
-    st.title("SenticGuard Web v3.1")
+    st.title("SenticGuard Web v3.2")
     lang = st.selectbox("Alege Limba / Select Language", ["RO", "EN"], index=st.session_state.lang_idx)
     T = TRANSLATIONS[lang]
     st.markdown("---")
 
-# --- 3. DEEP LINKING LOGIC (Capturing External Parameters) ---
-# Check for URL parameters (e.g., ?url=https://site.com)
+# --- 4. DEEP LINKING LOGIC ---
 query_params = st.query_params
 external_url = query_params.get("url")
 
-# Set a trigger flag if an external URL is provided and not yet analyzed in this session
 if external_url and 'auto_analyzed' not in st.session_state:
     st.session_state.auto_analyzed = external_url
     trigger_external = True
 else:
     trigger_external = False
 
-# --- 4. CATEGORY DEFINITIONS (COLORS) ---
+# --- 5. CATEGORY DEFINITIONS ---
 CATEGORIES = {
     "OBIECTIV": "#10b981",
     "ALARMIST": "#ef4444",
@@ -51,7 +79,7 @@ CATEGORIES = {
     "OPINIE": "#64748b"
 }
 
-# --- 5. CUSTOM UI STYLING ---
+# --- 6. CUSTOM UI STYLING ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -73,10 +101,9 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 6. MODEL INITIALIZATION & LOGIC ---
+# --- 7. MODEL INITIALIZATION ---
 @st.cache_resource
 def load_model():
-    """Load the classification pipeline from the HuggingFace Hub."""
     model_path = "florin-lupsa/NewsAnalyzer" 
     try:
         return pipeline("text-classification", model=model_path, tokenizer=model_path)
@@ -87,7 +114,6 @@ def load_model():
 cls_pipeline = load_model()
 
 def analyze_text(text):
-    """Infers the sentiment/category of the provided text string."""
     if not text or not cls_pipeline:
         return None
     prediction = cls_pipeline(text.strip()[:512])[0]
@@ -100,10 +126,6 @@ def analyze_text(text):
     }
 
 def get_final_verdict(res_titlu, res_content):
-    """
-    Combines results from title and body using internal weights.
-    Returns a final classification and a randomly selected natural language phrase.
-    """
     if not res_content:
         label_v = T["labels_map"].get(res_titlu['label'], res_titlu['label'])
         phrase = random.choice(T["phrases"]["match_high"]).format(label_v=label_v)
@@ -137,7 +159,7 @@ def get_final_verdict(res_titlu, res_content):
     
     return verdict_final
 
-# --- 7. USER INTERFACE ---
+# --- 8. USER INTERFACE ---
 st.title(T["main_title"])
 
 col_header, col_logo = st.columns([4, 1])
@@ -153,7 +175,6 @@ analysis_mode = st.radio("Source:", [T["tab_link"], T["tab_manual"]], horizontal
 
 with st.container():
     if analysis_mode == T["tab_link"]:
-        # Populate with external URL if present, otherwise empty
         default_val = external_url if external_url else ""
         input_data = st.text_input(T["url_label"], value=default_val, placeholder="https://...", key=f"url_{st.session_state.reset_key}")
     else:
@@ -161,20 +182,18 @@ with st.container():
     
     c1, c2 = st.columns([1, 5])
     with c1:
-        # Trigger analysis if button clicked OR if deep linking is active
         analyze_clicked = st.button(T["analyze_btn"], type="primary", use_container_width=True)
         if trigger_external:
             analyze_clicked = True
             
     with c2:
         if st.button(T["reset_btn"], type="secondary"):
-            # Clear auto_analyzed flag on manual reset
             if 'auto_analyzed' in st.session_state:
                 del st.session_state.auto_analyzed
             st.session_state.reset_key += 1
             st.rerun()
 
-# --- 8. PROCESSING & RESULTS ---
+# --- 9. PROCESSING & RESULTS ---
 if analyze_clicked:
     titlu_analiza = ""
     text_analiza = ""
@@ -200,6 +219,10 @@ if analyze_clicked:
         res_content = analyze_text(text_analiza) if text_analiza else None
         verdict_final = get_final_verdict(res_titlu, res_content)
 
+        # LOG THE ANALYSIS FOR ADMIN STATS
+        log_mode = "Link" if analysis_mode == T["tab_link"] else "Manual"
+        log_analysis(input_data, verdict_final['label'], verdict_final['score'], log_mode)
+
         # MAIN VERDICT CARD
         st.markdown(f"""
             <div class="verdict-card" style="border-top: 5px solid {verdict_final['color']};">
@@ -213,7 +236,7 @@ if analyze_clicked:
             </div>
         """, unsafe_allow_html=True)
 
-        # TECHNICAL DETAILS (Expander focused on metrics)
+        # TECHNICAL DETAILS
         with st.expander(T['deep_title']):
             col_r1, col_r2 = st.columns(2)
             with col_r1: 
@@ -229,9 +252,8 @@ if analyze_clicked:
             
             st.divider()
             st.write(f"**{T['tech_final_label']}** {verdict_final['score']:.2%}")
-            st.caption(f"{T['tech_config_label']} {WEIGHT_CONTENT*100:.0f}% {T['weight_content_text']} / {WEIGHT_TITLE*100:.0f}% {T['weight_title_text']}")
 
-# --- 9. SIDEBAR LEGEND ---
+# --- 10. SIDEBAR LEGEND ---
 with st.sidebar:
     st.markdown("---")
     for cat, color in CATEGORIES.items():
