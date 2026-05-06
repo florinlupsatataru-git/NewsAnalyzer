@@ -24,7 +24,7 @@ if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 def login():
-    st.title("🔐 SenticGuard Admin Panel")
+    st.title("🛡️ SenticGuard Admin Panel")
     parola = st.text_input("Introdu parola de administrator", type="password")
     if st.button("Log In"):
         if parola == st.secrets["ADMIN_PASSWORD"]:
@@ -87,13 +87,19 @@ def load_classifier():
 
 # --- 5. MAIN NAVIGATION (TABS) ---
 st.title("🛡️ SenticGuard Master Control")
-tab_stats, tab_training = st.tabs(["📊 Statistici Live", "📥 Colectare & Training"])
+tab_stats, tab_training = st.tabs(["Statistici Live", "Colectare & Training"])
 
 # ==========================================
 # TAB 1: LIVE STATISTICS (FROM LOGS)
 # ==========================================
 with tab_stats:
-    st.header("📈 Monitorizare Verificări Utilizatori")
+    col_title, col_refresh = st.columns([0.8, 0.2])
+    with col_title:
+        st.header("Monitorizare Verificări Utilizatori")
+    with col_refresh:
+        if st.button("🔄", use_container_width=True):
+            st.rerun()
+
     df_logs = load_logs()
     
     if not df_logs.empty:
@@ -120,14 +126,14 @@ with tab_stats:
             st.plotly_chart(fig_verdicte, use_container_width=True)
             
         with col_bar:
-            st.subheader("🌐 Top 5 Surse Verificate")
+            st.subheader("Top 5 Surse Verificate")
             # Aggregated sources to see which domains are most analyzed
             top_sources = df_logs['source'].value_counts().head(5).reset_index()
             fig_sources = px.bar(top_sources, x='count', y='source', orientation='h',
                                  labels={'count':'Nr. Verificări', 'source':'Domeniu'})
             st.plotly_chart(fig_sources, use_container_width=True)
 
-        st.subheader("📋 Detalii Analize Recente")
+        st.subheader("Detalii Analize Recente")
         # Display logs sorted by the most recent timestamp
         st.dataframe(df_logs.sort_values(by='timestamp', ascending=False), use_container_width=True)
     else:
@@ -137,7 +143,7 @@ with tab_stats:
 # TAB 2: COLLECTION & TRAINING (ORIGINAL LOGIC)
 # ==========================================
 with tab_training:
-    st.header("📥 Colectare & Validare Date")
+    st.header("Colectare & Validare Date")
     
     RSS_FEEDS = {
         "Mediafax": "https://www.mediafax.ro/rss",
@@ -169,7 +175,7 @@ with tab_training:
             st.session_state.temp_df = pd.DataFrame(new_data)
 
     if "temp_df" in st.session_state:
-        st.write("### 📝 Analiză și Validare Manuală")
+        st.write("### Analiză și Validare Manuală")
         valid_entries = []
         
         for index, row in st.session_state.temp_df.iterrows():
@@ -195,9 +201,9 @@ with tab_training:
                 valid_entries.append({"text": row['text'], "label": CATEGORIES_MAP[alegere]})
             st.divider()
 
-        if st.button("💾 Confirmă și Salvează în Dataset", type="primary"):
+        if st.button("Confirmă și Salvează în Dataset", type="primary"):
             if not valid_entries:
-                st.warning("⚠️ Nu ai selectat niciun titlu pentru validare.")
+                st.warning("Nu ai selectat niciun titlu pentru validare.")
             else:
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -206,7 +212,7 @@ with tab_training:
                     updated_df = pd.concat([existing_df, to_save], ignore_index=True)
                     conn.update(data=updated_df)
                     st.session_state.df = updated_df
-                    st.success(f"✅ Adăugat {len(to_save)} titluri noi!")
+                    st.success(f"Adăugat {len(to_save)} titluri noi!")
                     del st.session_state.temp_df
                     st.rerun()
                 except Exception as e:
@@ -222,7 +228,7 @@ if "df" in st.session_state and st.session_state.df is not None:
         if k in counts:
             counts[int(k)] = v
 
-if st.sidebar.button("🔄 Refresh Main Data"):
+if st.sidebar.button("Refresh Main Data"):
     load_global_data()
     st.rerun()
 
@@ -240,7 +246,7 @@ with st.sidebar.expander("Vezi descrierea și statisticile", expanded=True):
      """)
 
 st.sidebar.divider()
-st.sidebar.title("➕ Adăugare Manuală")
+st.sidebar.title("Adăugare Manuală")
 with st.sidebar.form("manual_add_form", clear_on_submit=True):
     manual_text = st.text_area("Titlu știre nouă:", key="manual_text_input")
     manual_cat = st.selectbox("Categorie:", list(CATEGORIES_MAP.keys()))
@@ -255,7 +261,7 @@ with st.sidebar.form("manual_add_form", clear_on_submit=True):
                 updated_df = pd.concat([existing_df, new_row], ignore_index=True)
                 conn.update(data=updated_df)
                 st.session_state.df = updated_df
-                st.success("✅ Titlu salvat!")
+                st.success("Titlu salvat!")
             except Exception as e:
                 st.error(f"Eroare: {e}")
         else:
