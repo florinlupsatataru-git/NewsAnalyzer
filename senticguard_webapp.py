@@ -5,7 +5,7 @@ from newspaper import Article, Config
 from senticguard_translations import TRANSLATIONS
 
 # --- 1. CONFIGURATION & CONSTANTS ---
-# Tune the algorithm globally
+# Internal weights for the hybrid algorithm
 WEIGHT_CONTENT = 0.7 
 WEIGHT_TITLE = 0.3
 
@@ -29,7 +29,7 @@ with st.sidebar:
     T = TRANSLATIONS[lang]
     st.markdown("---")
 
-# --- 3. CATEGORY COLORS DEFINITIONS ---
+# --- 3. CATEGORY DEFINITIONS (COLORS) ---
 CATEGORIES = {
     "OBIECTIV": "#10b981",
     "ALARMIST": "#ef4444",
@@ -39,7 +39,7 @@ CATEGORIES = {
     "OPINIE": "#64748b"
 }
 
-# --- 4. UI STYLING ---
+# --- 4. CUSTOM UI STYLING ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -54,13 +54,17 @@ st.markdown(f"""
         color: white; font-size: 13px; font-weight: 700; 
         text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 15px; 
     }}
+    .article-title {{
+        margin-top: 0; margin-bottom: 15px; color: #0f172a; 
+        font-size: 1.4rem; font-weight: 700; line-height: 1.3;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
 # --- 5. MODEL INITIALIZATION & LOGIC ---
 @st.cache_resource
 def load_model():
-    """Load the Transformer model from HuggingFace Hub."""
+    """Load the classification pipeline from the HuggingFace Hub."""
     model_path = "florin-lupsa/NewsAnalyzer" 
     try:
         return pipeline("text-classification", model=model_path, tokenizer=model_path)
@@ -71,10 +75,9 @@ def load_model():
 cls_pipeline = load_model()
 
 def analyze_text(text):
-    """Run inference on a single string and return detailed classification data."""
+    """Infers the sentiment/category of the provided text string."""
     if not text or not cls_pipeline:
         return None
-    # Truncate text to 512 tokens for model compatibility
     prediction = cls_pipeline(text.strip()[:512])[0]
     label = prediction['label']
     return {
@@ -86,35 +89,29 @@ def analyze_text(text):
 
 def get_final_verdict(res_titlu, res_content):
     """
-    Hybrid Algorithm: Combines title and content scores using internal weights.
-    Selects a conversational phrase based on confidence levels and match/mismatch status.
+    Combines results from title and body using internal weights.
+    Returns a final classification and a randomly selected natural language phrase.
     """
     if not res_content:
-        # Case for Manual Mode or missing content
         label_v = T["labels_map"].get(res_titlu['label'], res_titlu['label'])
         phrase = random.choice(T["phrases"]["match_high"]).format(label_v=label_v)
         res = res_titlu.copy()
         res['explanation'] = phrase
         return res
     
-    # 1. Weighted score calculation
     score_final_c = res_content['score'] * WEIGHT_CONTENT
     score_final_t = res_titlu['score'] * WEIGHT_TITLE
     
-    # 2. Determine dominant label
     if score_final_c >= score_final_t:
         verdict_final = res_content.copy()
-        # Visual boost for combined certainty
         verdict_final['score'] = score_final_c + (res_titlu['score'] * 0.1) 
     else:
         verdict_final = res_titlu.copy()
         verdict_final['score'] = score_final_t + (res_content['score'] * 0.1)
 
-    # 3. Prepare grammatical labels for phrase interpolation
     label_v_str = T["labels_map"].get(verdict_final['label'], verdict_final['label'])
     label_s_str = T["labels_map"].get(res_titlu['label'] if score_final_c >= score_final_t else res_content['label'])
 
-    # 4. Phrase category selection logic
     is_match = res_titlu['label'] == res_content['label']
     is_high = verdict_final['score'] > 0.85
     
@@ -123,7 +120,6 @@ def get_final_verdict(res_titlu, res_content):
     else:
         category = "mismatch_high" if is_high else "mismatch_low"
     
-    # 5. Pick a random conversational template
     phrase_template = random.choice(T["phrases"][category])
     verdict_final['explanation'] = phrase_template.format(label_v=label_v_str, label_s=label_s_str)
     
@@ -157,14 +153,14 @@ with st.container():
             st.session_state.reset_key += 1
             st.rerun()
 
-# --- 7. RESULTS PROCESSING ---
+# --- 7. PROCESSING & RESULTS ---
 if analyze_clicked:
     titlu_analiza = ""
     text_analiza = ""
 
     if analysis_mode == T["tab_link"] and input_data:
         try:
-            with st.spinner('Scraping article...'):
+            with st.spinner('Scraping content...'):
                 config = Config()
                 config.browser_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...'
                 article = Article(input_data, config=config)
@@ -181,27 +177,22 @@ if analyze_clicked:
     else:
         res_titlu = analyze_text(titlu_analiza)
         res_content = analyze_text(text_analiza) if text_analiza else None
-        
-        # Calculate verdict using internal weights
         verdict_final = get_final_verdict(res_titlu, res_content)
 
-        # MAIN CARD DISPLAY (Human-Readable)
         st.markdown(f"""
             <div class="verdict-card" style="border-top: 5px solid {verdict_final['color']};">
                 <div class="verdict-badge" style="background-color: {verdict_final['color']};">
                     {verdict_final['label']}
                 </div>
-                <p style="font-size: 1.15rem; color: #1e293b; font-weight: 500; line-height: 1.6; margin-bottom: 0;">
+                <h3 class="article-title">{titlu_analiza}</h3>
+                <p style="font-size: 1.1rem; color: #334155; font-weight: 500; line-height: 1.5; margin-bottom: 0;">
                     {verdict_final['explanation']}
                 </p>
             </div>
         """, unsafe_allow_html=True)
 
-        # TECHNICAL DETAILS (Expander)
+        # TECHNICAL DETAILS (Expander focused on metrics)
         with st.expander(T['deep_title']):
-            st.markdown(f"**{T['manual_label']}:** {titlu_analiza}")
-            st.divider()
-            
             col_r1, col_r2 = st.columns(2)
             with col_r1: 
                 st.metric(T["tech_manual_label"], res_titlu['label'])
