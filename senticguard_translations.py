@@ -30,6 +30,8 @@ TRANSLATIONS = {
         "weight_info_label": "Pondere actuală:",
         "weight_content_text": "Conținut",
         "weight_title_text": "Titlu",
+        "weight_content_text": "conținut",
+        "weight_title_text": "titlu",
         "categories": {
             "OBIECTIV": "Informație neutră, bazată pe fapte verificabile.",
             "ALARMIST": "Titlu care induce panică sau teamă exagerată.",
@@ -126,6 +128,8 @@ TRANSLATIONS = {
         "weight_info_label": "Current weight:",
         "weight_content_text": "Content",
         "weight_title_text": "Title",
+        "weight_content_text": "content",
+        "weight_title_text": "title",
         "categories": {
             "OBIECTIV": "Neutral info, based on verifiable facts.",
             "ALARMIST": "Headlines designed to induce panic or fear.",
