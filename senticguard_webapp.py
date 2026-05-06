@@ -207,7 +207,7 @@ if analyze_clicked:
             
             st.divider()
             st.write(f"**{T['tech_final_label']}** {verdict_final['score']:.2%}")
-            st.caption(f"{T['tech_config_label']} {WEIGHT_CONTENT*100:.0f}% content / {WEIGHT_TITLE*100:.0f}% title")
+            st.caption(f"{T['tech_config_label']} {WEIGHT_CONTENT*100:.0f}% {T['weight_content_text']} / {WEIGHT_TITLE*100:.0f}% {T['weight_title_text']}")
 
 # --- 8. SIDEBAR LEGEND ---
 with st.sidebar:
