@@ -1,10 +1,11 @@
 import os
 import psycopg2
+import subprocess
 from flask import Flask, request, render_template, redirect, url_for, session, abort
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# Load local environment variables
+# Load local environment variables from .env
 load_dotenv()
 
 app = Flask(__name__)
@@ -12,7 +13,7 @@ app.secret_key = os.getenv("SECRET_KEY", "default_secret_key")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 def get_db_connection():
-    """Connect to PostgreSQL using env variables"""
+    """Connect to PostgreSQL using environment variables"""
     return psycopg2.connect(
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
@@ -21,6 +22,7 @@ def get_db_connection():
     )
 
 def check_rate_limit(ip):
+    """Check how many requests an IP has made in the last minute"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -33,6 +35,7 @@ def check_rate_limit(ip):
     except: return 0
 
 def log_event(ip, event_type, severity, desc):
+    """Log security events into the PostgreSQL database"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -45,9 +48,11 @@ def log_event(ip, event_type, severity, desc):
         conn.commit()
         cur.close()
         conn.close()
-    except Exception as e: print(f"DB Log Error: {e}")
+    except Exception as e: 
+        print(f"DB Log Error: {e}")
 
 def is_banned(ip):
+    """Check if an IP is permanently banned"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -58,22 +63,41 @@ def is_banned(ip):
         return banned
     except: return False
 
+# --- WEBHOOK ROUTE FOR AUTOMATION ---
+@app.route('/update_server', methods=['POST'])
+def update_server():
+    """Endpoint for GitHub Webhook to trigger automatic git pull"""
+    try:
+        # Executes git pull in the project directory
+        # Make sure the path matches your server structure
+        project_dir = '/home/ubuntu/senticguard'
+        subprocess.Popen(['git', 'pull', 'origin', 'main'], cwd=project_dir)
+        
+        log_event(request.remote_addr, "AUTO_UPDATE", 1, "Git pull triggered via Webhook")
+        return 'Server updated successfully', 200
+    except Exception as e:
+        return str(e), 500
+
 @app.route('/')
 def public_home():
+    """Main entry point: logs the visit and redirects to the public Streamlit app"""
     ip = request.remote_addr
     if is_banned(ip):
         abort(403)
+    
     log_event(ip, "VISIT", 1, "Redirect to AI Interface")
-    # Redirect to the Streamlit Public Interface
+    # Redirect to the Streamlit Public Interface on port 8502
     return redirect("http://89.168.117.245:8502")
 
 @app.route('/wp-admin')
 @app.route('/.env')
+@app.route('/config.php')
 def honeypot():
+    """Honeypot routes to catch and ban malicious scanners"""
     ip = request.remote_addr
     log_event(ip, "HACK_ATTEMPT", 10, f"Honeypot hit: {request.path}")
     return abort(403)
 
 if __name__ == '__main__':
-    # Running on port 8500 as established on the server
+    # Flask gateway running on port 8500
     app.run(host='0.0.0.0', port=8500, debug=False)
