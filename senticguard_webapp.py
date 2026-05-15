@@ -2,7 +2,6 @@ import streamlit as st
 import random
 import pandas as pd
 import psycopg2
-from datetime import datetime
 from transformers import pipeline
 from newspaper import Article, Config
 from streamlit_gsheets import GSheetsConnection
@@ -21,7 +20,9 @@ st.set_page_config(
 
 # --- 2. DATABASE LOGGING (PostgreSQL) ---
 def get_db_connection():
-    """Establishes connection to the PostgreSQL database using secrets."""
+    """
+    Establishes connection to the PostgreSQL database using Streamlit secrets.
+    """
     return psycopg2.connect(
         host=st.secrets["postgres"]["host"],
         database=st.secrets["postgres"]["database"],
@@ -36,11 +37,11 @@ def log_security_event(event_type="VISIT_8501", severity=1, description="Direct 
     Captures real IP even behind Docker proxy.
     """
     try:
-        # Capture IP from headers (X-Forwarded-For is common in Docker/Proxy setups)
+        # Capture IP from headers (X-Forwarded-For is essential for Docker setups)
         headers = st.context.headers
         ip_address = headers.get("X-Forwarded-For", headers.get("Remote-Addr", "Unknown"))
         
-        # Clean IP string if multiple IPs are present in X-Forwarded-For
+        # Clean IP string if multiple IPs are present
         if "," in ip_address:
             ip_address = ip_address.split(",")[0].strip()
 
@@ -57,10 +58,10 @@ def log_security_event(event_type="VISIT_8501", severity=1, description="Direct 
         cur.close()
         conn.close()
     except Exception as e:
-        # Silent fail for UI stability, errors visible in docker logs
+        # Error is printed to docker logs but won't crash the UI
         print(f"Postgres Logging Error: {e}")
 
-# Trigger logging on every script run (visit)
+# Automatically trigger logging when the app loads
 log_security_event()
 
 # --- 3. ANALYTICS LOGGING (Google Sheets) ---
