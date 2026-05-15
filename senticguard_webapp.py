@@ -1,6 +1,8 @@
 import streamlit as st
 import random
 import pandas as pd
+import psycopg2
+from datetime import datetime
 from transformers import pipeline
 from newspaper import Article, Config
 from streamlit_gsheets import GSheetsConnection
@@ -17,19 +19,59 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. LOGGING FUNCTION ---
+# --- 2. DATABASE LOGGING (PostgreSQL) ---
+def get_db_connection():
+    """Establishes connection to the PostgreSQL database using secrets."""
+    return psycopg2.connect(
+        host=st.secrets["postgres"]["host"],
+        database=st.secrets["postgres"]["database"],
+        user=st.secrets["postgres"]["user"],
+        password=st.secrets["postgres"]["password"],
+        port=st.secrets["postgres"]["port"]
+    )
+
+def log_security_event(event_type="VISIT_8501", severity=1, description="Direct access to Streamlit interface"):
+    """
+    Logs access and security events directly to PostgreSQL.
+    Captures real IP even behind Docker proxy.
+    """
+    try:
+        # Capture IP from headers (X-Forwarded-For is common in Docker/Proxy setups)
+        headers = st.context.headers
+        ip_address = headers.get("X-Forwarded-For", headers.get("Remote-Addr", "Unknown"))
+        
+        # Clean IP string if multiple IPs are present in X-Forwarded-For
+        if "," in ip_address:
+            ip_address = ip_address.split(",")[0].strip()
+
+        browser = headers.get("User-Agent", "Unknown")
+        referrer = headers.get("Referer", "Direct")
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO security_logs (ip_address, event_type, severity, description, browser_info, referrer) VALUES (%s, %s, %s, %s, %s, %s)",
+            (ip_address, event_type, severity, description, browser, referrer)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        # Silent fail for UI stability, errors visible in docker logs
+        print(f"Postgres Logging Error: {e}")
+
+# Trigger logging on every script run (visit)
+log_security_event()
+
+# --- 3. ANALYTICS LOGGING (Google Sheets) ---
 def log_analysis(input_data, verdict, score, mode):
-    """
-    Saves analysis metadata. 
-    'source' stores the domain, 'detail' stores the full URL/text.
-    """
+    """Saves analysis metadata to Google Sheets for administrative stats."""
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         existing_logs = conn.read(worksheet="Logs", ttl=0)
         
         domain = "Manual Input"
         if mode == "Link" and input_data.startswith("http"):
-            # Extrage 'site.ro' din 'https://www.site.ro/articol'
             domain = input_data.split('/')[2].replace('www.', '')
 
         new_log = pd.DataFrame([{
@@ -46,7 +88,7 @@ def log_analysis(input_data, verdict, score, mode):
     except Exception:
         pass
 
-# --- 3. LANGUAGE SELECTION & SESSION STATE ---
+# --- 4. LANGUAGE SELECTION & SESSION STATE ---
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
 
@@ -54,12 +96,12 @@ with st.sidebar:
     if 'lang_idx' not in st.session_state:
         st.session_state.lang_idx = 0
         
-    st.title("SenticGuard Web v3.2")
+    st.title("SenticGuard Web v3.3")
     lang = st.selectbox("Alege Limba / Select Language", ["RO", "EN"], index=st.session_state.lang_idx)
     T = TRANSLATIONS[lang]
     st.markdown("---")
 
-# --- 4. DEEP LINKING LOGIC ---
+# --- 5. DEEP LINKING LOGIC ---
 query_params = st.query_params
 external_url = query_params.get("url")
 
@@ -69,7 +111,7 @@ if external_url and 'auto_analyzed' not in st.session_state:
 else:
     trigger_external = False
 
-# --- 5. CATEGORY DEFINITIONS ---
+# --- 6. CATEGORY DEFINITIONS ---
 CATEGORIES = {
     "OBIECTIV": "#10b981",
     "ALARMIST": "#ef4444",
@@ -79,7 +121,7 @@ CATEGORIES = {
     "OPINIE": "#64748b"
 }
 
-# --- 6. CUSTOM UI STYLING ---
+# --- 7. CUSTOM UI STYLING ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -101,7 +143,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 7. MODEL INITIALIZATION ---
+# --- 8. MODEL INITIALIZATION ---
 @st.cache_resource
 def load_model():
     model_path = "florin-lupsa/NewsAnalyzer" 
@@ -159,7 +201,7 @@ def get_final_verdict(res_titlu, res_content):
     
     return verdict_final
 
-# --- 8. USER INTERFACE ---
+# --- 9. USER INTERFACE ---
 st.title(T["main_title"])
 
 col_header, col_logo = st.columns([4, 1])
@@ -193,7 +235,7 @@ with st.container():
             st.session_state.reset_key += 1
             st.rerun()
 
-# --- 9. PROCESSING & RESULTS ---
+# --- 10. PROCESSING & RESULTS ---
 if analyze_clicked:
     titlu_analiza = ""
     text_analiza = ""
@@ -253,7 +295,7 @@ if analyze_clicked:
             st.divider()
             st.write(f"**{T['tech_final_label']}** {verdict_final['score']:.2%}")
 
-# --- 10. SIDEBAR LEGEND ---
+# --- 11. SIDEBAR LEGEND ---
 with st.sidebar:
     st.markdown("---")
     for cat, color in CATEGORIES.items():
